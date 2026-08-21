@@ -11,6 +11,7 @@ interface UserProfileModalProps {
   onOpenFriendManager: () => void;
   onOpenPrivacy?: () => void;
   onOpenTerms?: () => void;
+  onOpenLandingHome?: () => void;
   onLogout?: () => void;
 }
 
@@ -30,6 +31,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onOpenFriendManager,
   onOpenPrivacy,
   onOpenTerms,
+  onOpenLandingHome,
   onLogout,
 }) => {
   const [displayName, setDisplayName] = useState(currentUser.displayName || '');
@@ -299,6 +301,21 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
           {/* Legal / Policy Links */}
           <div className="pt-2 flex items-center justify-center gap-3 text-[11px] text-stone-500">
+            {onOpenLandingHome && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenLandingHome();
+                  }}
+                  className="hover:text-stone-800 hover:underline cursor-pointer font-medium"
+                >
+                  アプリ紹介
+                </button>
+                <span>•</span>
+              </>
+            )}
             <button
               type="button"
               onClick={() => {

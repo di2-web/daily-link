@@ -6,13 +6,14 @@ import {
   supabaseGetProfile,
   isSupabaseConfigured,
 } from '../lib/supabase';
-import { Sparkles, User, Lock, Mail, Loader2, ArrowRight } from 'lucide-react';
+import { Sparkles, User, Lock, Mail, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { UserProfile } from '../types';
 
 interface AuthScreenProps {
   onLoginSuccess: (user: UserProfile) => void;
   onOpenPrivacy?: () => void;
   onOpenTerms?: () => void;
+  onBackToHome?: () => void;
 }
 
 const AVATAR_SELECTIONS = [
@@ -27,6 +28,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   onLoginSuccess,
   onOpenPrivacy,
   onOpenTerms,
+  onBackToHome,
 }) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -132,6 +134,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     <div className="min-h-screen bg-[#faf8f5] flex flex-col items-center justify-center p-4 selection:bg-amber-200">
       {/* Visual Header */}
       <div className="max-w-md w-full text-center space-y-3 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        {onBackToHome && (
+          <div className="flex justify-start mb-2">
+            <button
+              type="button"
+              onClick={onBackToHome}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/80 hover:bg-white border border-stone-200 text-stone-700 text-xs font-semibold shadow-2xs transition-all cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>ホームページ（機能紹介）に戻る</span>
+            </button>
+          </div>
+        )}
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-amber-100/80 border border-amber-200 shadow-xs mb-1">
           <span className="text-3xl filter drop-shadow-xs">🏡</span>
         </div>

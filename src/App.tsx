@@ -28,6 +28,7 @@ import {
 } from './lib/supabase';
 
 import { AuthScreen } from './components/AuthScreen';
+import { LandingHomepageView } from './components/LandingHomepageView';
 import { RoomFeedSwipeView } from './components/RoomFeedSwipeView';
 import { HomeFriendHouses } from './components/HomeFriendHouses';
 import { FriendPorchModal } from './components/FriendPorchModal';
@@ -59,17 +60,24 @@ const deduplicateObjects = (list: RoomObject[]): RoomObject[] => {
   });
 };
 
+export type AppRoute = 'home' | 'login' | 'app' | 'privacy' | 'terms';
+
+const getInitialRoute = (): AppRoute => {
+  if (typeof window === 'undefined') return 'home';
+  const path = window.location.pathname.toLowerCase();
+  const search = new URLSearchParams(window.location.search);
+  const page = search.get('page') || search.get('view');
+
+  if (path.includes('/privacy') || page === 'privacy') return 'privacy';
+  if (path.includes('/terms') || page === 'terms') return 'terms';
+  if (path.includes('/login') || page === 'login') return 'login';
+  if (path.includes('/home') || page === 'home') return 'home';
+  return 'home';
+};
+
 export function App() {
-  // Legal Pages routing state (Direct URL support for /privacy and /terms)
-  const [currentLegalView, setCurrentLegalView] = useState<'privacy' | 'terms' | null>(() => {
-    if (typeof window === 'undefined') return null;
-    const path = window.location.pathname.toLowerCase();
-    const search = new URLSearchParams(window.location.search);
-    const page = search.get('page') || search.get('view');
-    if (path.includes('/privacy') || page === 'privacy') return 'privacy';
-    if (path.includes('/terms') || page === 'terms') return 'terms';
-    return null;
-  });
+  // Application Routing State
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>(() => getInitialRoute());
 
   // Navigation & View States
   const [activeTab, setActiveTab] = useState<MainNavTab>('myroom');
@@ -98,39 +106,33 @@ export function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isFriendManagerOpen, setIsFriendManagerOpen] = useState(false);
 
-  // URL Routing Listener for Legal Pages (/privacy & /terms)
+  // Sync route and Browser History (Supports /home, /login, /privacy, /terms)
+  const navigateToRoute = (route: AppRoute) => {
+    setCurrentRoute(route);
+    let targetPath = '/';
+    if (route === 'privacy') targetPath = '/privacy';
+    else if (route === 'terms') targetPath = '/terms';
+    else if (route === 'login') targetPath = '/login';
+    else if (route === 'home') targetPath = '/home';
+    else if (route === 'app') targetPath = '/';
+
+    if (window.location.pathname !== targetPath) {
+      try {
+        window.history.pushState({}, '', targetPath);
+      } catch (err) {
+        // Handle iframe pushState safety
+      }
+    }
+  };
+
   useEffect(() => {
     const handlePopState = () => {
-      const path = window.location.pathname.toLowerCase();
-      const search = new URLSearchParams(window.location.search);
-      const page = search.get('page') || search.get('view');
-      if (path.includes('/privacy') || page === 'privacy') {
-        setCurrentLegalView('privacy');
-      } else if (path.includes('/terms') || page === 'terms') {
-        setCurrentLegalView('terms');
-      } else {
-        setCurrentLegalView(null);
-      }
+      setCurrentRoute(getInitialRoute());
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
-
-  const openLegalView = (view: 'privacy' | 'terms') => {
-    setCurrentLegalView(view);
-    const newPath = view === 'privacy' ? '/privacy' : '/terms';
-    if (window.location.pathname !== newPath) {
-      window.history.pushState({}, '', newPath);
-    }
-  };
-
-  const closeLegalView = () => {
-    setCurrentLegalView(null);
-    if (window.location.pathname.includes('/privacy') || window.location.pathname.includes('/terms')) {
-      window.history.pushState({}, '', '/');
-    }
-  };
 
   // 1. Supabase Auth Listener
   useEffect(() => {
@@ -140,6 +142,7 @@ export function App() {
       if (!isMounted) return;
       if (supabaseUser && profile) {
         setCurrentUser(profile);
+        setCurrentRoute((prev) => (prev === 'login' ? 'app' : prev));
       } else if (!supabaseUser) {
         // Logged out
         setCurrentUser(null);
@@ -147,6 +150,7 @@ export function App() {
         setFriendsList([]);
         setAllRoomObjects([]);
         setNotifications([]);
+        setCurrentRoute((prev) => (prev === 'app' ? 'home' : prev));
       }
       setAuthLoading(false);
     });
@@ -516,6 +520,7 @@ export function App() {
       setFriendsList([]);
       setAllRoomObjects([]);
       setNotifications([]);
+      navigateToRoute('home');
 
       try {
         localStorage.removeItem('roomon_user_profile');
@@ -532,15 +537,15 @@ export function App() {
     }
   };
 
-  // Legal Policy Views (Accessible directly via URL or buttons, regardless of login state)
-  if (currentLegalView === 'privacy') {
-    return <PrivacyPolicyView onBack={closeLegalView} />;
+  // 1. Legal Policy Views (Accessible directly via URL /privacy or /terms, or buttons)
+  if (currentRoute === 'privacy') {
+    return <PrivacyPolicyView onBack={() => navigateToRoute(currentUser ? 'app' : 'home')} />;
   }
-  if (currentLegalView === 'terms') {
-    return <TermsOfServiceView onBack={closeLegalView} />;
+  if (currentRoute === 'terms') {
+    return <TermsOfServiceView onBack={() => navigateToRoute(currentUser ? 'app' : 'home')} />;
   }
 
-  // Loading Screen
+  // 2. Loading Screen
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#faf8f5] flex items-center justify-center">
@@ -552,13 +557,41 @@ export function App() {
     );
   }
 
-  // 1. MUST LOGIN: Show AuthScreen if not authenticated
+  // 3. Unauthenticated Visitors: Default to App Homepage (OAuth requirement) or Login
   if (!currentUser) {
+    if (currentRoute === 'login') {
+      return (
+        <AuthScreen
+          onLoginSuccess={(user) => {
+            setCurrentUser(user);
+            navigateToRoute('app');
+          }}
+          onBackToHome={() => navigateToRoute('home')}
+          onOpenPrivacy={() => navigateToRoute('privacy')}
+          onOpenTerms={() => navigateToRoute('terms')}
+        />
+      );
+    }
+
+    // Public App Homepage for guests and OAuth verification reviewers
     return (
-      <AuthScreen
-        onLoginSuccess={(user) => setCurrentUser(user)}
-        onOpenPrivacy={() => openLegalView('privacy')}
-        onOpenTerms={() => openLegalView('terms')}
+      <LandingHomepageView
+        onOpenAuth={() => navigateToRoute('login')}
+        onOpenPrivacy={() => navigateToRoute('privacy')}
+        onOpenTerms={() => navigateToRoute('terms')}
+      />
+    );
+  }
+
+  // 4. Authenticated User explicitly viewing the App Homepage (/home)
+  if (currentRoute === 'home') {
+    return (
+      <LandingHomepageView
+        isLoggedIn={true}
+        onGoToApp={() => navigateToRoute('app')}
+        onOpenAuth={() => navigateToRoute('app')}
+        onOpenPrivacy={() => navigateToRoute('privacy')}
+        onOpenTerms={() => navigateToRoute('terms')}
       />
     );
   }
@@ -837,8 +870,9 @@ export function App() {
         currentUser={currentUser}
         onProfileUpdated={(updated) => setCurrentUser(updated)}
         onOpenFriendManager={() => setIsFriendManagerOpen(true)}
-        onOpenPrivacy={() => openLegalView('privacy')}
-        onOpenTerms={() => openLegalView('terms')}
+        onOpenPrivacy={() => navigateToRoute('privacy')}
+        onOpenTerms={() => navigateToRoute('terms')}
+        onOpenLandingHome={() => navigateToRoute('home')}
         onLogout={handleLogout}
       />
 

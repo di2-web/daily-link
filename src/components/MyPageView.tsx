@@ -27,6 +27,7 @@ interface MyPageViewProps {
   onOpenProfileEdit: () => void;
   onOpenPrivacy?: () => void;
   onOpenTerms?: () => void;
+  onOpenLandingHome?: () => void;
   onLogout: () => void;
 }
 
@@ -39,6 +40,7 @@ export const MyPageView: React.FC<MyPageViewProps> = ({
   onOpenProfileEdit,
   onOpenPrivacy,
   onOpenTerms,
+  onOpenLandingHome,
   onLogout,
 }) => {
   const [copied, setCopied] = useState(false);
@@ -175,6 +177,25 @@ export const MyPageView: React.FC<MyPageViewProps> = ({
             )}
           </button>
         </div>
+
+        {/* App Homepage / Introduction */}
+        {onOpenLandingHome && (
+          <button
+            onClick={onOpenLandingHome}
+            className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-amber-50 text-amber-900">
+                <Info className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-stone-900">アプリ紹介・機能概要</p>
+                <p className="text-[10px] text-stone-500">DailyLinkの機能とデータ利用説明</p>
+              </div>
+            </div>
+            <span className="text-xs text-stone-400">＞</span>
+          </button>
+        )}
 
         {/* Privacy Policy */}
         <button
