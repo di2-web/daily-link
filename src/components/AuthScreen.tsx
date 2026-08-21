@@ -372,7 +372,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
       {/* Feature Footnote & Legal Footer */}
       <div className="mt-5 text-center text-[11px] text-stone-500 max-w-sm space-y-2">
-        <p>🔒 招待した親しい友達（2〜5人）とだけ繋がれる完全クローズド設計です。</p>
+        <p>🔒 招待した親しい友達とだけ繋がれる完全クローズド設計です。</p>
         <div className="flex items-center justify-center gap-3 pt-1 text-stone-600 font-medium">
           <button
             type="button"

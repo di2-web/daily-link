@@ -111,7 +111,7 @@ export const LandingHomepageView: React.FC<LandingHomepageViewProps> = ({
 
         <h1 className="text-3xl sm:text-5xl font-extrabold text-stone-900 tracking-tight leading-tight sm:leading-tight">
           日々のつぶやきが、お部屋の家具になる。<br />
-          <span className="text-amber-900">親しい友達（2〜5人）と過ごす、完全クローズド空間SNS。</span>
+          <span className="text-amber-900">親しい友達と過ごす、完全クローズド空間SNS。</span>
         </h1>
 
         <p className="text-sm sm:text-base text-stone-600 max-w-2xl mx-auto leading-relaxed">
@@ -181,7 +181,7 @@ export const LandingHomepageView: React.FC<LandingHomepageViewProps> = ({
                 </div>
                 <h3 className="font-bold text-sm text-stone-900">友達のお部屋を行き来</h3>
                 <p className="text-xs text-stone-500 leading-relaxed">
-                  親しい友達（2〜5人）の部屋へお散歩。お花やコーヒーを置く優しいリアクション。
+                  親しい友達の部屋へお散歩。お花やコーヒーを置く優しいリアクション。
                 </p>
               </div>
             </div>
@@ -261,7 +261,7 @@ export const LandingHomepageView: React.FC<LandingHomepageViewProps> = ({
                   🔒
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-stone-900">完全クローズド（2〜5人限定）</h3>
+                  <h3 className="font-bold text-base text-stone-900">完全クローズド設計</h3>
                   <span className="text-[10px] font-semibold text-sky-800">Ultra-Private Circles</span>
                 </div>
               </div>

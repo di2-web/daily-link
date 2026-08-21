@@ -109,7 +109,7 @@ export const FriendsRoomView: React.FC<FriendsRoomViewProps> = ({
             <h2 className="text-xl font-bold text-stone-900">友達の部屋（クローズド）</h2>
           </div>
           <p className="text-xs text-stone-500 mt-1">
-            親しい人（2〜5人）の部屋を覗いたり、テラスにお花やコーヒーをそっと置けます
+            親しい友達の部屋を覗いたり、テラスにお花やコーヒーをそっと置けます
           </p>
         </div>
 
@@ -236,7 +236,7 @@ export const FriendsRoomView: React.FC<FriendsRoomViewProps> = ({
           </div>
           <h3 className="font-bold text-stone-900 text-base">友達がまだ登録されていません</h3>
           <p className="text-xs text-stone-500 max-w-md mx-auto">
-            DailyLinkは親しい友達（2〜5人）だけの完全クローズド空間です。
+            DailyLinkは招待した友達同士でつながる完全クローズド空間です。
             招待リンクをLINEなどで共有して、お互いの部屋をつなぎましょう。
           </p>
           <button

@@ -201,7 +201,7 @@ export const HomeFriendHouses: React.FC<HomeFriendHousesProps> = ({
           <div className="space-y-1">
             <h3 className="font-bold text-stone-900 text-sm sm:text-base">まだお友達の家がありません</h3>
             <p className="text-xs text-stone-500 max-w-xs mx-auto leading-relaxed">
-              DailyLinkは親しい友達（2〜5人）とつながるプライベート空間です。専用招待リンクやユーザー名検索でお友達を追加しましょう。
+              DailyLinkは親しい友達や大切な人とつながるプライベート空間です。専用招待リンクやユーザー名検索でお友達を追加しましょう。
             </p>
           </div>
           {onOpenFriendManager && (
