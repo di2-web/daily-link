@@ -86,7 +86,7 @@ export async function supabaseSignUp(email: string, password: string, displayNam
       bio: '日常のできごとをお部屋に飾っています🌱',
       avatarOutfit: 'casual_hoodie',
       customShareCategories: ['親友', '部活', '家族', 'パートナー'],
-      latestStatus: { text: 'Roomonをはじめました！', emoji: '🌱', updatedAt: new Date().toISOString() },
+      latestStatus: { text: 'DailyLinkをはじめました！', emoji: '🌱', updatedAt: new Date().toISOString() },
       createdAt: new Date().toISOString(),
     };
     const users = getLocalData<Record<string, UserProfile>>(LOCAL_STORAGE_USERS_KEY, {});
@@ -119,7 +119,7 @@ export async function supabaseSignUp(email: string, password: string, displayNam
       bio: '日常のできごとをお部屋に飾っています🌱',
       avatarOutfit: 'casual_hoodie',
       customShareCategories: ['親友', '部活', '家族', 'パートナー'],
-      latestStatus: { text: 'Roomonをはじめました！', emoji: '🌱', updatedAt: new Date().toISOString() },
+      latestStatus: { text: 'DailyLinkをはじめました！', emoji: '🌱', updatedAt: new Date().toISOString() },
       createdAt: new Date().toISOString(),
     };
     await supabaseSaveProfile(profile);

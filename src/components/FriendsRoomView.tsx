@@ -236,7 +236,7 @@ export const FriendsRoomView: React.FC<FriendsRoomViewProps> = ({
           </div>
           <h3 className="font-bold text-stone-900 text-base">友達がまだ登録されていません</h3>
           <p className="text-xs text-stone-500 max-w-md mx-auto">
-            Roomonは親しい友達（2〜5人）だけの完全クローズド空間です。
+            DailyLinkは親しい友達（2〜5人）だけの完全クローズド空間です。
             招待リンクをLINEなどで共有して、お互いの部屋をつなぎましょう。
           </p>
           <button

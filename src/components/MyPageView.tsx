@@ -224,7 +224,7 @@ export const MyPageView: React.FC<MyPageViewProps> = ({
 
       {/* App & Operator Info Card */}
       <div className="p-4 rounded-3xl bg-stone-100/70 border border-stone-200/80 text-center space-y-1">
-        <p className="text-xs font-bold text-stone-700">Roomon（ルーモン） v1.0</p>
+        <p className="text-xs font-bold text-stone-700">DailyLink v1.0</p>
         <p className="text-[11px] text-stone-500">
           お問い合わせ: <a href="mailto:di0119264@gmail.com" className="text-amber-900 underline font-medium">di0119264@gmail.com</a>
         </p>

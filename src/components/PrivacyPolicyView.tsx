@@ -74,7 +74,7 @@ export const PrivacyPolicyView: React.FC<PrivacyPolicyViewProps> = ({ onBack }) 
               プライバシーポリシー
             </h1>
             <p className="text-xs sm:text-sm text-stone-500 mt-1">
-              サービス名: Roomon（ルーモン） / LifeLog AI Diary
+              サービス名: DailyLink
             </p>
             <p className="text-xs text-stone-400 mt-0.5">
               最終更新日・制定日: 2026年8月20日
@@ -82,7 +82,7 @@ export const PrivacyPolicyView: React.FC<PrivacyPolicyViewProps> = ({ onBack }) 
           </div>
 
           <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-xs sm:text-sm text-stone-700 leading-relaxed">
-            「Roomon（ルーモン）」（以下「本サービス」）は、ユーザーの皆様が安心して日々の記録や思い出を親しいフレンドと共有できるよう、個人情報の保護およびデータセキュリティを最重要事項として取り扱います。本プライバシーポリシーでは、当サービスにおける個人情報の収集、利用、管理、および保護について定めます。
+            「DailyLink」（以下「本サービス」）は、ユーザーの皆様が安心して日々の記録や思い出を親しいフレンドと共有できるよう、個人情報の保護およびデータセキュリティを最重要事項として取り扱います。本プライバシーポリシーでは、当サービスにおける個人情報の収集、利用、管理、および保護について定めます。
           </div>
         </div>
 
@@ -266,7 +266,7 @@ export const PrivacyPolicyView: React.FC<PrivacyPolicyViewProps> = ({ onBack }) 
               本プライバシーポリシーに関するご質問、個人情報の取扱いに関するご相談や削除請求は、以下の窓口までご連絡ください。
             </p>
             <div className="p-4 rounded-2xl bg-amber-50/50 border border-amber-200/80 space-y-1.5">
-              <p className="font-bold text-stone-900">Roomon（ルーモン）運営窓口</p>
+              <p className="font-bold text-stone-900">DailyLink 運営窓口</p>
               <div className="flex items-center gap-2 text-stone-700">
                 <Mail className="w-4 h-4 text-amber-700" />
                 <span>メールアドレス: <a href="mailto:di0119264@gmail.com" className="text-amber-900 font-bold underline hover:text-amber-950">di0119264@gmail.com</a></span>
@@ -281,7 +281,7 @@ export const PrivacyPolicyView: React.FC<PrivacyPolicyViewProps> = ({ onBack }) 
 
         {/* Footer info */}
         <div className="text-center text-xs text-stone-500 py-4 space-y-2">
-          <p>© 2026 Roomon (LifeLog AI Diary). All rights reserved.</p>
+          <p>© 2026 DailyLink. All rights reserved.</p>
           <div className="flex justify-center gap-4 text-amber-900 font-semibold">
             <a
               href="/terms"

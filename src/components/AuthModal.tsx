@@ -103,7 +103,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             uid: userCred.user.uid,
             displayName: name,
             photoURL: photo,
-            bio: 'Roomonで日常を空間オブジェクトに記録しています',
+            bio: 'DailyLinkで日常を空間オブジェクトに記録しています',
             customShareCategories: ['親友', '部活', '家族', 'パートナー'],
             createdAt: new Date().toISOString(),
           };
@@ -118,7 +118,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             photoURL:
               userCred.user.photoURL ||
               'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-            bio: 'Roomonで日常を空間オブジェクトに記録しています',
+            bio: 'DailyLinkで日常を空間オブジェクトに記録しています',
             createdAt: new Date().toISOString(),
           };
           onLoginSuccess(profile);
@@ -144,7 +144,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         uid: userCred.user.uid,
         displayName: guestName,
         photoURL: photo,
-        bio: 'Roomonで日常を空間オブジェクトに記録しています',
+        bio: 'DailyLinkで日常を空間オブジェクトに記録しています',
         customShareCategories: ['親友', '部活', '家族'],
         createdAt: new Date().toISOString(),
       };
@@ -168,7 +168,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-xl">🛋️</span>
             <div>
-              <h3 className="font-bold text-stone-900 text-base">Roomon（ルーモン）</h3>
+              <h3 className="font-bold text-stone-900 text-base">DailyLink</h3>
               <p className="text-xs text-stone-500">完全クローズド空間SNS</p>
             </div>
           </div>

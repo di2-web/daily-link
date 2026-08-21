@@ -74,7 +74,7 @@ export const TermsOfServiceView: React.FC<TermsOfServiceViewProps> = ({ onBack }
               サービス利用規約
             </h1>
             <p className="text-xs sm:text-sm text-stone-500 mt-1">
-              サービス名: Roomon（ルーモン） / LifeLog AI Diary
+              サービス名: DailyLink
             </p>
             <p className="text-xs text-stone-400 mt-0.5">
               最終更新日・制定日: 2026年8月20日
@@ -82,7 +82,7 @@ export const TermsOfServiceView: React.FC<TermsOfServiceViewProps> = ({ onBack }
           </div>
 
           <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 text-xs sm:text-sm text-stone-700 leading-relaxed">
-            本利用規約（以下「本規約」）は、「Roomon（ルーモン）」（以下「本サービス」）の提供条件および本サービスをご利用いただく全てのユーザーの皆様（以下「ユーザー」）との権利義務関係を定めるものです。本サービスをご利用（アカウント登録、Google認証等の利用を含む）される前に、本規約の全文をお読みいただき、同意いただく必要があります。
+            本利用規約（以下「本規約」）は、「DailyLink」（以下「本サービス」）の提供条件および本サービスをご利用いただく全てのユーザーの皆様（以下「ユーザー」）との権利義務関係を定めるものです。本サービスをご利用（アカウント登録、Google認証等の利用を含む）される前に、本規約の全文をお読みいただき、同意いただく必要があります。
           </div>
         </div>
 
@@ -109,7 +109,7 @@ export const TermsOfServiceView: React.FC<TermsOfServiceViewProps> = ({ onBack }
             </h2>
             <p>本規約において使用する主要な用語の定義は、以下の通りとします。</p>
             <ul className="list-disc list-inside space-y-1 pl-1 text-stone-700">
-              <li><strong>「本サービス」:</strong> 当運営が提供するクローズド空間SNSおよびライフログ日記サービス「Roomon」および関連する全機能。</li>
+              <li><strong>「本サービス」:</strong> 当運営が提供するクローズド空間SNSおよびライフログ日記サービス「DailyLink」および関連する全機能。</li>
               <li><strong>「ユーザー」:</strong> 本規約に同意の上、本サービスに登録または利用する個人。</li>
               <li><strong>「投稿データ」:</strong> ユーザーが本サービス上に記録・アップロードしたテキスト、日記、音声、画像、感情値等の情報。</li>
               <li><strong>「AI生成物」:</strong> 投稿データに基づき、生成AI技術を通じて作成される3Dミニチュアオブジェクト、感情オーブ、要約テキスト等。</li>
@@ -232,7 +232,7 @@ export const TermsOfServiceView: React.FC<TermsOfServiceViewProps> = ({ onBack }
             </h2>
             <p>本規約に関するお問い合わせは、下記窓口までご連絡ください。</p>
             <div className="p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-1">
-              <p className="font-bold text-stone-900">Roomon（ルーモン）運営事務局</p>
+              <p className="font-bold text-stone-900">DailyLink 運営事務局</p>
               <div className="flex items-center gap-2 text-stone-700 text-xs sm:text-sm">
                 <Mail className="w-4 h-4 text-amber-700" />
                 <span>連絡先: <a href="mailto:di0119264@gmail.com" className="text-amber-900 font-bold underline hover:text-amber-950">di0119264@gmail.com</a></span>
@@ -244,7 +244,7 @@ export const TermsOfServiceView: React.FC<TermsOfServiceViewProps> = ({ onBack }
 
         {/* Footer info */}
         <div className="text-center text-xs text-stone-500 py-4 space-y-2">
-          <p>© 2026 Roomon (LifeLog AI Diary). All rights reserved.</p>
+          <p>© 2026 DailyLink. All rights reserved.</p>
           <div className="flex justify-center gap-4 text-amber-900 font-semibold">
             <a
               href="/terms"

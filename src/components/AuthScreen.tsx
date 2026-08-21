@@ -137,7 +137,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         </div>
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight flex items-center justify-center gap-2">
-            <span>Roomon</span>
+            <span>DailyLink</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-200/70 text-amber-950 font-bold">
               完全クローズド空間SNS
             </span>

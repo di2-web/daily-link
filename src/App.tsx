@@ -256,7 +256,7 @@ export function App() {
             'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400&auto=format&fit=crop&q=80',
           x: 48,
           y: 65,
-          caption: 'Roomonを始めました！これからの思い出をここに飾っていきます✨',
+          caption: 'DailyLinkを始めました！これからの思い出をここに飾っていきます✨',
           date: new Date().toISOString().slice(0, 10),
           areaType: 'base_room',
           isPinned: true,
