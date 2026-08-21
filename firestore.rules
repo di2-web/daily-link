@@ -15,6 +15,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Profiles Collection
+    match /profiles/{userId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isOwner(userId);
+    }
+
     // Users Collection
     match /users/{userId} {
       allow read: if isSignedIn();
@@ -22,32 +29,14 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
-    // Posts Collection
-    match /posts/{postId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
     // Room Objects Collection
     match /room_objects/{objectId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create, update, delete: if isSignedIn();
     }
 
-    // Shared Matches (合言葉おそろいアイテム生成)
-    match /shared_matches/{matchId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // Reaction Gifts Collection (花、コーヒー、メッセージカード)
-    match /reaction_gifts/{giftId} {
-      allow read: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
-    }
-
-    // Friends collection (Closed Friends)
-    match /friends/{friendId} {
+    // Friend Relations Collection
+    match /friend_relations/{relationId} {
       allow read: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
@@ -58,11 +47,28 @@ service cloud.firestore {
       allow create, update, delete: if isSignedIn();
     }
 
-    // Mood Waves Collection (バイオリズム)
-    match /mood_waves/{waveId} {
+    // Wave Canvas (バイオリズム・感情波)
+    match /wave_canvas/{canvasId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Shared Matches (合言葉おそろいアイテム生成)
+    match /shared_matches/{matchId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Reaction Gifts Collection
+    match /reaction_gifts/{giftId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    // Friends collection (Legacy)
+    match /friends/{friendId} {
       allow read: if isSignedIn();
       allow create, update, delete: if isSignedIn();
     }
   }
 }
-

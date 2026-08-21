@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import {
-  supabaseSignUp,
-  supabaseSignIn,
-  supabaseSignInWithGoogle,
-  supabaseGetProfile,
-  isSupabaseConfigured,
-} from '../lib/supabase';
+  firebaseSignUp,
+  firebaseSignIn,
+  firebaseSignInWithGoogle,
+  firebaseGetProfile,
+} from '../lib/firebase';
 import { Sparkles, User, Lock, Mail, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { UserProfile } from '../types';
 
@@ -44,14 +43,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     setGoogleLoading(true);
     setErrorMessage('');
     try {
-      const res: any = await supabaseSignInWithGoogle();
+      const res = await firebaseSignInWithGoogle();
       if (res.error) {
         throw res.error;
       }
       if (res.profile) {
         onLoginSuccess(res.profile);
-      } else if (res.data?.user?.id) {
-        const profile = await supabaseGetProfile(res.data.user.id);
+      } else if (res.data?.user?.uid) {
+        const profile = await firebaseGetProfile(res.data.user.uid);
         if (profile) {
           onLoginSuccess(profile);
         }
@@ -76,7 +75,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       const name = displayName.trim() || '私の部屋';
 
       if (isSignUp) {
-        const { profile, error } = await supabaseSignUp(
+        const { profile, error } = await firebaseSignUp(
           email,
           password,
           name,
@@ -93,7 +92,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           return;
         }
       } else {
-        const { profile, error } = await supabaseSignIn(email, password);
+        const { profile, error } = await firebaseSignIn(email, password);
         if (error) {
           throw error;
         }
@@ -109,12 +108,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       if (
         msg.includes('invalid-credential') ||
         msg.includes('Invalid login credentials') ||
-        msg.includes('wrong-password')
+        msg.includes('wrong-password') ||
+        msg.includes('user-not-found')
       ) {
         setErrorMessage('メールアドレスまたはパスワードが正しくありません。');
       } else if (
         msg.includes('already-in-use') ||
-        msg.includes('User already registered')
+        msg.includes('email-already-in-use')
       ) {
         setErrorMessage('このメールアドレスは既に登録されています。ログインしてください。');
       } else if (
