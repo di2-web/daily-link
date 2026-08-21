@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { UserProfile } from '../types';
-import { db, doc, setDoc } from '../firebase';
+import { supabaseSaveProfile } from '../lib/supabase';
 import { X, User, LogOut, Check, Sparkles, Tag, Plus, Camera, Upload, Loader2, RefreshCw } from 'lucide-react';
 
 interface UserProfileModalProps {
@@ -9,6 +9,8 @@ interface UserProfileModalProps {
   currentUser: UserProfile;
   onProfileUpdated: (updated: UserProfile) => void;
   onOpenFriendManager: () => void;
+  onOpenPrivacy?: () => void;
+  onOpenTerms?: () => void;
   onLogout?: () => void;
 }
 
@@ -26,6 +28,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   currentUser,
   onProfileUpdated,
   onOpenFriendManager,
+  onOpenPrivacy,
+  onOpenTerms,
   onLogout,
 }) => {
   const [displayName, setDisplayName] = useState(currentUser.displayName || '');
@@ -104,7 +108,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         customShareCategories: categories,
       };
 
-      await setDoc(doc(db, 'users', currentUser.uid), updated, { merge: true });
+      await supabaseSaveProfile(updated);
       onProfileUpdated(updated);
       alert('プロフィールを保存しました。');
       onClose();
@@ -287,9 +291,34 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 onClose();
                 onOpenFriendManager();
               }}
-              className="w-full py-2.5 rounded-2xl bg-stone-100 border border-stone-200 hover:bg-stone-200 text-stone-800 text-xs font-semibold transition-colors"
+              className="w-full py-2.5 rounded-2xl bg-stone-100 border border-stone-200 hover:bg-stone-200 text-stone-800 text-xs font-semibold transition-colors cursor-pointer"
             >
               🤝 友達リストの管理・招待リンク
+            </button>
+          </div>
+
+          {/* Legal / Policy Links */}
+          <div className="pt-2 flex items-center justify-center gap-3 text-[11px] text-stone-500">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                if (onOpenTerms) onOpenTerms();
+              }}
+              className="hover:text-stone-800 hover:underline cursor-pointer"
+            >
+              利用規約
+            </button>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                if (onOpenPrivacy) onOpenPrivacy();
+              }}
+              className="hover:text-stone-800 hover:underline cursor-pointer"
+            >
+              プライバシーポリシー
             </button>
           </div>
 

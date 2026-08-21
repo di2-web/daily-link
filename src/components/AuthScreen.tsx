@@ -6,17 +6,13 @@ import {
   supabaseGetProfile,
   isSupabaseConfigured,
 } from '../lib/supabase';
-import { auth, db, doc, getDoc, setDoc, googleProvider, signInWithPopup } from '../firebase';
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  updateProfile,
-} from 'firebase/auth';
 import { Sparkles, User, Lock, Mail, Loader2, ArrowRight } from 'lucide-react';
 import { UserProfile } from '../types';
 
 interface AuthScreenProps {
   onLoginSuccess: (user: UserProfile) => void;
+  onOpenPrivacy?: () => void;
+  onOpenTerms?: () => void;
 }
 
 const AVATAR_SELECTIONS = [
@@ -27,7 +23,11 @@ const AVATAR_SELECTIONS = [
   'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&auto=format&fit=crop&q=80',
 ];
 
-export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
+export const AuthScreen: React.FC<AuthScreenProps> = ({
+  onLoginSuccess,
+  onOpenPrivacy,
+  onOpenTerms,
+}) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,61 +42,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
     setGoogleLoading(true);
     setErrorMessage('');
     try {
-      if (isSupabaseConfigured) {
-        // 1. Supabase OAuth Google Sign In
-        const { error } = await supabaseSignInWithGoogle();
-        if (error) {
-          throw error;
-        }
-        return;
+      const res: any = await supabaseSignInWithGoogle();
+      if (res.error) {
+        throw res.error;
       }
-
-      // 2. Firebase Popup Fallback
-      const userCred = await signInWithPopup(auth, googleProvider);
-      const user = userCred.user;
-      
-      const name = user.displayName || '私の部屋';
-      const emailPrefix = user.email?.split('@')[0] || user.uid.slice(0, 6);
-      let profile: UserProfile = {
-        uid: user.uid,
-        displayName: name,
-        username: `@${emailPrefix}`,
-        photoURL: user.photoURL || AVATAR_SELECTIONS[0],
-        bio: '日常の小さな出来事を部屋のインテリアに記録しています🌱',
-        avatarOutfit: 'casual_hoodie',
-        customShareCategories: ['親友', '部活', '家族', 'パートナー'],
-        latestStatus: {
-          text: 'Roomonをはじめました！',
-          emoji: '🌱',
-          updatedAt: new Date().toISOString(),
-        },
-        createdAt: new Date().toISOString(),
-      };
-
-      try {
-        const userDocRef = doc(db, 'users', user.uid);
-        const snap = await getDoc(userDocRef);
-        if (snap.exists()) {
-          profile = snap.data() as UserProfile;
-        } else {
-          await setDoc(userDocRef, profile, { merge: true });
+      if (res.profile) {
+        onLoginSuccess(res.profile);
+      } else if (res.data?.user?.id) {
+        const profile = await supabaseGetProfile(res.data.user.id);
+        if (profile) {
+          onLoginSuccess(profile);
         }
-      } catch (dbErr) {
-        console.warn('Initial profile doc sync deferred:', dbErr);
       }
-
-      onLoginSuccess(profile);
     } catch (err: any) {
       console.error('Google Sign In error:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
-        setErrorMessage('ログイン用ポップアップが閉じられました。');
-      } else if (err.code === 'auth/cancelled-popup-request') {
-        // Ignored
-      } else if (err.code === 'auth/popup-blocked') {
-        setErrorMessage('ポップアップがブラウザによってブロックされました。ポップアップを許可してください。');
-      } else {
-        setErrorMessage(err.message || 'Googleログインに失敗しました。');
-      }
+      setErrorMessage(err.message || 'Googleログインに失敗しました。');
     } finally {
       setGoogleLoading(false);
     }
@@ -113,9 +73,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
         : `@user_${Math.floor(100 + Math.random() * 900)}`;
       const name = displayName.trim() || '私の部屋';
 
-      // ======================================================================
-      // 1. Supabase Auth (Primary)
-      // ======================================================================
       if (isSignUp) {
         const { profile, error } = await supabaseSignUp(
           email,
@@ -130,21 +87,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
         }
 
         if (profile) {
-          // Sync with local/firebase if available in background
-          try {
-            const userCred = await createUserWithEmailAndPassword(auth, email, password).catch(() => null);
-            if (userCred?.user) {
-              await updateProfile(userCred.user, { displayName: name, photoURL: selectedPhoto }).catch(() => {});
-              await setDoc(doc(db, 'users', profile.uid), profile, { merge: true }).catch(() => {});
-            }
-          } catch {
-            // Ignore optional sync error
-          }
           onLoginSuccess(profile);
           return;
         }
       } else {
-        // Sign In with Supabase Auth
         const { profile, error } = await supabaseSignIn(email, password);
         if (error) {
           throw error;
@@ -156,62 +102,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
         }
       }
     } catch (err: any) {
-      console.error('Auth error, attempting fallback:', err);
-      // If error occurred, attempt Firebase Auth fallback
-      try {
-        if (isSignUp) {
-          const userCred = await createUserWithEmailAndPassword(auth, email, password);
-          const name = displayName.trim() || '私の部屋';
-          const uName = username.trim() ? (username.startsWith('@') ? username : `@${username}`) : `@user_${Math.floor(100 + Math.random() * 900)}`;
-
-          await updateProfile(userCred.user, {
-            displayName: name,
-            photoURL: selectedPhoto,
-          });
-
-          const profile: UserProfile = {
-            uid: userCred.user.uid,
-            displayName: name,
-            username: uName,
-            photoURL: selectedPhoto,
-            bio: '日常の小さな出来事を部屋のインテリアに記録しています🌱',
-            avatarOutfit: 'casual_hoodie',
-            customShareCategories: ['親友', '部活', '家族', 'パートナー'],
-            latestStatus: {
-              text: 'Roomonをはじめました！',
-              emoji: '🌱',
-              updatedAt: new Date().toISOString(),
-            },
-            createdAt: new Date().toISOString(),
-          };
-
-          await setDoc(doc(db, 'users', userCred.user.uid), profile, { merge: true });
-          onLoginSuccess(profile);
-          return;
-        } else {
-          const userCred = await signInWithEmailAndPassword(auth, email, password);
-          const profile: UserProfile = {
-            uid: userCred.user.uid,
-            displayName: userCred.user.displayName || '私の部屋',
-            username: `@user_${userCred.user.uid.slice(0, 6)}`,
-            photoURL: userCred.user.photoURL || AVATAR_SELECTIONS[0],
-            bio: '日常の小さな出来事を部屋のインテリアに記録しています🌱',
-            createdAt: new Date().toISOString(),
-          };
-          onLoginSuccess(profile);
-          return;
-        }
-      } catch (fbErr: any) {
-        const msg = err.message || fbErr.message || '';
-        if (msg.includes('invalid-credential') || msg.includes('Invalid login credentials') || msg.includes('wrong-password')) {
-          setErrorMessage('メールアドレスまたはパスワードが正しくありません。');
-        } else if (msg.includes('already-in-use') || msg.includes('User already registered')) {
-          setErrorMessage('このメールアドレスは既に登録されています。ログインしてください。');
-        } else if (msg.includes('weak-password') || msg.includes('Password should be')) {
-          setErrorMessage('パスワードは6文字以上で設定してください。');
-        } else {
-          setErrorMessage(msg || '認証に失敗しました。');
-        }
+      console.error('Auth error:', err);
+      const msg = err.message || '';
+      if (
+        msg.includes('invalid-credential') ||
+        msg.includes('Invalid login credentials') ||
+        msg.includes('wrong-password')
+      ) {
+        setErrorMessage('メールアドレスまたはパスワードが正しくありません。');
+      } else if (
+        msg.includes('already-in-use') ||
+        msg.includes('User already registered')
+      ) {
+        setErrorMessage('このメールアドレスは既に登録されています。ログインしてください。');
+      } else if (
+        msg.includes('weak-password') ||
+        msg.includes('Password should be')
+      ) {
+        setErrorMessage('パスワードは6文字以上で設定してください。');
+      } else {
+        setErrorMessage(msg || '認証に失敗しました。');
       }
     } finally {
       setLoading(false);
@@ -409,7 +319,28 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
           </button>
         </form>
 
-        <div className="mt-5 pt-4 border-t border-stone-100 text-center">
+        {/* Legal Consent Notice */}
+        <p className="mt-3 text-center text-[11px] text-stone-500 leading-normal">
+          ログインまたはアカウント登録により、
+          <button
+            type="button"
+            onClick={onOpenTerms}
+            className="text-amber-900 font-bold underline hover:text-amber-950 mx-0.5 cursor-pointer"
+          >
+            利用規約
+          </button>
+          および
+          <button
+            type="button"
+            onClick={onOpenPrivacy}
+            className="text-amber-900 font-bold underline hover:text-amber-950 mx-0.5 cursor-pointer"
+          >
+            プライバシーポリシー
+          </button>
+          に同意したものとみなされます。
+        </p>
+
+        <div className="mt-4 pt-3.5 border-t border-stone-100 text-center">
           <button
             type="button"
             onClick={() => {
@@ -425,10 +356,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
         </div>
       </div>
 
-      {/* Feature Footnote */}
-      <div className="mt-6 text-center text-[11px] text-stone-500 max-w-sm space-y-1">
+      {/* Feature Footnote & Legal Footer */}
+      <div className="mt-5 text-center text-[11px] text-stone-500 max-w-sm space-y-2">
         <p>🔒 招待した親しい友達（2〜5人）とだけ繋がれる完全クローズド設計です。</p>
-        <p>数字の比較やいいね数のストレスなく、穏やかに近況を感じ合えます。</p>
+        <div className="flex items-center justify-center gap-3 pt-1 text-stone-600 font-medium">
+          <button
+            type="button"
+            onClick={onOpenTerms}
+            className="hover:text-stone-900 underline cursor-pointer"
+          >
+            利用規約
+          </button>
+          <span>•</span>
+          <button
+            type="button"
+            onClick={onOpenPrivacy}
+            className="hover:text-stone-900 underline cursor-pointer"
+          >
+            プライバシーポリシー
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,7 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { UserProfile, RoomObject, PlacementSlot, ObjectCategory } from '../types';
 import { parseMomentToRoomObject, transcribeAudioWithAi } from '../lib/geminiApi';
-import { db, collection, addDoc, doc, updateDoc, getDocs, query, where, orderBy } from '../firebase';
+import {
+  supabaseSaveRoomObject,
+  supabaseFetchRoomObjects,
+  supabaseUpdateRoomObject,
+  supabaseUploadImage,
+} from '../lib/supabase';
 import {
   X,
   Sparkles,
@@ -185,25 +190,7 @@ export const MomentPostForm: React.FC<MomentPostFormProps> = ({
     setIsGenerating(true);
 
     try {
-      // 1. Save raw moment post to Firestore
-      const momentDoc = await addDoc(collection(db, 'posts'), {
-        userId: currentUser.uid,
-        userDisplayName: currentUser.displayName,
-        userPhotoURL: currentUser.photoURL,
-        contentText,
-        mediaUrls,
-        audioUrl,
-        locationData: locationSpot ? { spotName: locationSpot } : null,
-        musicMetadata: musicTrack ? { trackName: musicTrack, artistName: musicArtist } : null,
-        moodScore,
-        isProtected,
-        privacyScope: isProtected ? 'private' : 'friends',
-        isPrivate: Boolean(isProtected),
-        date: selectedDate,
-        createdAt: new Date().toISOString(),
-      });
-
-      // 2. AI Media to Room Object Parsing
+      // 1. AI Media to Room Object Parsing
       const aiObject = await parseMomentToRoomObject({
         contentText,
         mediaUrls,
@@ -214,7 +201,7 @@ export const MomentPostForm: React.FC<MomentPostFormProps> = ({
         userDisplayName: currentUser.displayName,
       });
 
-      // 2.5. Generate or fetch 3D Cozy Clay Miniature image
+      // 1.5. Generate or fetch 3D Cozy Clay Miniature image
       let itemImageUrl = mediaUrls[0] || undefined;
       try {
         const imgRes = await fetch('/api/ai/generate-item-image', {
@@ -238,20 +225,16 @@ export const MomentPostForm: React.FC<MomentPostFormProps> = ({
         console.warn('3D item image generation fallback:', imgErr);
       }
 
-      // 3. Determine initial areaType and execute Pattern 2 push-out if necessary
+      // 2. Determine initial areaType and execute Pattern 2 push-out if necessary
       // Rule: New items go to 'todays_spot' (or 'base_room' if pinned)
       const targetArea = isProtected ? 'base_room' : 'todays_spot';
 
       // Check current base_room items count to maintain 10-12 limit
       if (targetArea === 'base_room') {
-        const baseRoomQuery = query(
-          collection(db, 'room_objects'),
-          where('userId', '==', currentUser.uid),
-          where('areaType', '==', 'base_room')
+        const allObjects = await supabaseFetchRoomObjects();
+        const baseItems = allObjects.filter(
+          (o) => o.userId === currentUser.uid && o.areaType === 'base_room'
         );
-        const baseSnap = await getDocs(baseRoomQuery);
-        const baseItems: any[] = [];
-        baseSnap.forEach((d) => baseItems.push({ id: d.id, ...d.data() }));
 
         if (baseItems.length >= 12) {
           // Push-out Pattern 2:
@@ -262,7 +245,7 @@ export const MomentPostForm: React.FC<MomentPostFormProps> = ({
 
           if (unpinnedSolo.length > 0) {
             const pushItem = unpinnedSolo[0];
-            await updateDoc(doc(db, 'room_objects', pushItem.id), { areaType: 'closet' });
+            await supabaseUpdateRoomObject(pushItem.id, { areaType: 'closet' });
           } else {
             // 2. Find oldest unpinned shared item
             const unpinnedShared = baseItems
@@ -270,18 +253,17 @@ export const MomentPostForm: React.FC<MomentPostFormProps> = ({
               .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
             if (unpinnedShared.length > 0) {
               const pushItem = unpinnedShared[0];
-              await updateDoc(doc(db, 'room_objects', pushItem.id), { areaType: 'closet' });
+              await supabaseUpdateRoomObject(pushItem.id, { areaType: 'closet' });
             }
           }
         }
       }
 
-      // 4. Save the generated Room Object to Firestore
+      // 3. Save the generated Room Object to Supabase
       const newRoomObject: Omit<RoomObject, 'id'> = {
         userId: currentUser.uid,
         userDisplayName: currentUser.displayName,
         userPhotoURL: currentUser.photoURL,
-        postId: momentDoc.id,
         assetId: `${aiObject.category}_${Date.now()}`,
         name: aiObject.name,
         category: aiObject.category,
@@ -301,15 +283,8 @@ export const MomentPostForm: React.FC<MomentPostFormProps> = ({
         createdAt: new Date().toISOString(),
       };
 
-      const sanitizedObj: Record<string, any> = {};
-      Object.entries(newRoomObject).forEach(([k, v]) => {
-        if (v !== undefined) {
-          sanitizedObj[k] = v;
-        }
-      });
-
-      const roomObjDoc = await addDoc(collection(db, 'room_objects'), sanitizedObj);
-      onObjectCreated({ id: roomObjDoc.id, ...newRoomObject });
+      const savedRoomObject = await supabaseSaveRoomObject(newRoomObject);
+      onObjectCreated(savedRoomObject);
 
       onClose();
     } catch (err) {

@@ -2,16 +2,11 @@ import React, { useState } from 'react';
 import { UserProfile, RoomObject } from '../types';
 import { generateSharedMatchItem } from '../lib/geminiApi';
 import {
-  db,
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  where,
-  doc,
-  updateDoc,
-  arrayUnion,
-} from '../firebase';
+  supabaseCreateSharedMatch,
+  supabaseFindSharedMatch,
+  supabaseJoinSharedMatch,
+  supabaseSaveRoomObject,
+} from '../lib/supabase';
 import { X, Handshake, Sparkles, Key, Users, CheckCircle2, Loader2, Copy, Check } from 'lucide-react';
 
 interface SharedMatchModalProps {
@@ -57,7 +52,7 @@ export const SharedMatchModal: React.FC<SharedMatchModalProps> = ({
 
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
 
-      const matchRef = await addDoc(collection(db, 'shared_matches'), {
+      const matchId = await supabaseCreateSharedMatch({
         passCode: passCode.trim().toUpperCase(),
         creatorId: currentUser.uid,
         creatorDisplayName: currentUser.displayName,
@@ -65,8 +60,11 @@ export const SharedMatchModal: React.FC<SharedMatchModalProps> = ({
         matchedUserIds: [currentUser.uid],
         matchedUserNames: [currentUser.displayName],
         objectTemplate: aiItem,
-        createdAt: new Date().toISOString(),
       });
+
+      if (!matchId) {
+        throw new Error('Failed to create match session');
+      }
 
       // Place in creator's base room
       const newRoomObject: Omit<RoomObject, 'id'> = {
@@ -85,13 +83,13 @@ export const SharedMatchModal: React.FC<SharedMatchModalProps> = ({
         areaType: 'base_room',
         isPinned: true,
         isSharedItem: true,
-        sharedMatchId: matchRef.id,
+        sharedMatchId: matchId,
         sharedFriendNames: [currentUser.displayName],
         createdAt: new Date().toISOString(),
       };
 
-      const docSnap = await addDoc(collection(db, 'room_objects'), newRoomObject);
-      onMatchComplete({ id: docSnap.id, ...newRoomObject });
+      const savedObj = await supabaseSaveRoomObject(newRoomObject);
+      onMatchComplete(savedObj);
 
       setCreatedMatchCode(passCode.trim().toUpperCase());
     } catch (err) {
@@ -112,35 +110,25 @@ export const SharedMatchModal: React.FC<SharedMatchModalProps> = ({
 
     setLoading(true);
     try {
-      const q = query(
-        collection(db, 'shared_matches'),
-        where('passCode', '==', passCode.trim().toUpperCase())
-      );
-      const snap = await getDocs(q);
+      const match = await supabaseFindSharedMatch(passCode.trim().toUpperCase());
 
-      if (snap.empty) {
+      if (!match) {
         alert(`合言葉「${passCode}」のセッションが見つかりませんでした。友人に合言葉を確認してください。`);
         setLoading(false);
         return;
       }
 
-      const matchDoc = snap.docs[0];
-      const matchData = matchDoc.data();
-
       // Check expiration
-      if (new Date(matchData.expiresAt).getTime() < Date.now()) {
+      if (new Date(match.expiresAt).getTime() < Date.now()) {
         alert('この合言葉セッションは有効期限（24時間）が切れています。');
         setLoading(false);
         return;
       }
 
-      // Update match document with new joined user
-      await updateDoc(doc(db, 'shared_matches', matchDoc.id), {
-        matchedUserIds: arrayUnion(currentUser.uid),
-        matchedUserNames: arrayUnion(currentUser.displayName),
-      });
+      // Join session in Supabase
+      const joinedMatch = await supabaseJoinSharedMatch(match.id, currentUser);
 
-      const template = matchData.objectTemplate || {
+      const template = match.objectTemplate || {
         name: 'おそろいのインテリア',
         category: 'desk',
         placementSlot: 'desk',
@@ -158,20 +146,20 @@ export const SharedMatchModal: React.FC<SharedMatchModalProps> = ({
         category: template.category,
         placementSlot: template.placementSlot || 'desk',
         iconEmoji: template.iconEmoji || '🤝',
-        x: template.suggestedX || 50,
-        y: template.suggestedY || 65,
+        x: (template as any).suggestedX || 50,
+        y: (template as any).suggestedY || 65,
         memoryNote: `合言葉「${passCode.trim().toUpperCase()}」でおそろい作成: ${template.memoryNote}`,
         date: selectedDate,
         areaType: 'base_room',
         isPinned: true,
         isSharedItem: true,
-        sharedMatchId: matchDoc.id,
-        sharedFriendNames: [...(matchData.matchedUserNames || []), currentUser.displayName],
+        sharedMatchId: match.id,
+        sharedFriendNames: joinedMatch?.matchedUserNames || [...(match.matchedUserNames || []), currentUser.displayName],
         createdAt: new Date().toISOString(),
       };
 
-      const docRef = await addDoc(collection(db, 'room_objects'), newRoomObject);
-      onMatchComplete({ id: docRef.id, ...newRoomObject });
+      const savedObj = await supabaseSaveRoomObject(newRoomObject);
+      onMatchComplete(savedObj);
 
       alert(`🎉 合言葉「${passCode}」が一致しました！「${template.name}」があなたの部屋に配置されました！`);
       onClose();

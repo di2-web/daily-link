@@ -148,7 +148,7 @@ export interface FriendRelation {
   friendUsername?: string;
   friendPhotoURL: string;
   friendBio?: string;
-  status?: 'accepted' | 'pending' | 'rejected';
+  status?: 'accepted' | 'pending' | 'rejected' | 'declined';
   requestedBy?: string; // UID of user who sent request
   statusText?: string;
   statusEmoji?: string;

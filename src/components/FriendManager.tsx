@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
-import { UserProfile, FriendRelation, AppNotification } from '../types';
-import { db, collection, addDoc, doc, deleteDoc, updateDoc, getDocs, query, where } from '../firebase';
+import { UserProfile, FriendRelation } from '../types';
+import {
+  supabaseSearchUsers,
+  supabaseSaveFriend,
+  supabaseCreateNotification,
+  supabaseUpdateFriendStatus,
+  supabaseDeleteFriend,
+} from '../lib/supabase';
 import {
   X,
   Users,
@@ -74,32 +80,12 @@ export const FriendManager: React.FC<FriendManagerProps> = ({
     setSearchResults([]);
 
     try {
-      const usersRef = collection(db, 'users');
-      const formattedUsername = qText.startsWith('@') ? qText : `@${qText}`;
-
-      const qUsername = query(usersRef, where('username', '==', formattedUsername));
-      const qName = query(usersRef, where('displayName', '==', qText));
-
-      const [snapUsername, snapName] = await Promise.all([
-        getDocs(qUsername),
-        getDocs(qName),
-      ]);
-
-      const foundMap = new Map<string, UserProfile>();
-      snapUsername.forEach((d) => {
-        const u = d.data() as UserProfile;
-        if (u.uid !== currentUser.uid) foundMap.set(u.uid, u);
-      });
-      snapName.forEach((d) => {
-        const u = d.data() as UserProfile;
-        if (u.uid !== currentUser.uid) foundMap.set(u.uid, u);
-      });
-
-      const list = Array.from(foundMap.values());
-      setSearchResults(list);
-      if (list.length === 0) {
+      const results = await supabaseSearchUsers(qText);
+      const filtered = results.filter((u) => u.uid !== currentUser.uid);
+      setSearchResults(filtered);
+      if (filtered.length === 0) {
         setSearchFeedback(
-          '一致するユーザーが見つかりませんでした。ユーザー名（例: @username）を正確に入力してください。'
+          '一致するユーザーが見つかりませんでした。ユーザー名（例: @username）または表示名を入力してください。'
         );
       }
     } catch (err) {
@@ -141,7 +127,7 @@ export const FriendManager: React.FC<FriendManagerProps> = ({
       const now = new Date().toISOString();
 
       // 1. Create document for currentUser
-      const myDocRef = await addDoc(collection(db, 'friends'), {
+      const mySaved = await supabaseSaveFriend({
         userId: currentUser.uid,
         friendUid: targetUser.uid,
         friendDisplayName: targetUser.displayName,
@@ -157,7 +143,7 @@ export const FriendManager: React.FC<FriendManagerProps> = ({
       });
 
       // 2. Create document for targetUser
-      await addDoc(collection(db, 'friends'), {
+      await supabaseSaveFriend({
         userId: targetUser.uid,
         friendUid: currentUser.uid,
         friendDisplayName: currentUser.displayName,
@@ -173,7 +159,7 @@ export const FriendManager: React.FC<FriendManagerProps> = ({
       });
 
       // 3. Create notification for targetUser
-      await addDoc(collection(db, 'notifications'), {
+      await supabaseCreateNotification({
         userId: targetUser.uid,
         type: 'friend_request',
         title: '友達申請が届きました 💌',
@@ -186,21 +172,7 @@ export const FriendManager: React.FC<FriendManagerProps> = ({
         createdAt: now,
       });
 
-      const updatedSent: FriendRelation = {
-        id: myDocRef.id,
-        userId: currentUser.uid,
-        friendUid: targetUser.uid,
-        friendDisplayName: targetUser.displayName,
-        friendUsername: targetUser.username,
-        friendPhotoURL: targetUser.photoURL,
-        friendBio: targetUser.bio || '親しい友達の部屋',
-        status: 'pending',
-        requestedBy: currentUser.uid,
-        assignedCategories: [selectedCategory],
-        createdAt: now,
-      };
-
-      onFriendsUpdated([...friendsList, updatedSent]);
+      onFriendsUpdated([...friendsList, mySaved]);
       setSearchResults((prev) => prev.filter((u) => u.uid !== targetUser.uid));
       setSearchQuery('');
       setActiveTab('sent');
@@ -219,30 +191,12 @@ export const FriendManager: React.FC<FriendManagerProps> = ({
     try {
       const now = new Date().toISOString();
 
-      // 1. Update currentUser's relation to accepted
       if (relation.id) {
-        await updateDoc(doc(db, 'friends', relation.id), {
-          status: 'accepted',
-          acceptedAt: now,
-        });
+        await supabaseUpdateFriendStatus(relation.id, 'accepted', now);
       }
 
-      // 2. Find and update the other user's relation to accepted
-      const otherQuery = query(
-        collection(db, 'friends'),
-        where('userId', '==', relation.friendUid),
-        where('friendUid', '==', currentUser.uid)
-      );
-      const otherSnap = await getDocs(otherQuery);
-      for (const d of otherSnap.docs) {
-        await updateDoc(doc(db, 'friends', d.id), {
-          status: 'accepted',
-          acceptedAt: now,
-        });
-      }
-
-      // 3. Send notification to the requester
-      await addDoc(collection(db, 'notifications'), {
+      // Send notification to the requester
+      await supabaseCreateNotification({
         userId: relation.friendUid,
         type: 'friend_accept',
         title: '友達申請が承認されました！🎉',
@@ -281,21 +235,8 @@ export const FriendManager: React.FC<FriendManagerProps> = ({
 
     setActionLoadingUid(relation.friendUid);
     try {
-      // Delete currentUser's relation doc
-      if (relation.id) {
-        await deleteDoc(doc(db, 'friends', relation.id));
-      }
-
-      // Delete other user's relation doc
-      const otherQuery = query(
-        collection(db, 'friends'),
-        where('userId', '==', relation.friendUid),
-        where('friendUid', '==', currentUser.uid)
-      );
-      const otherSnap = await getDocs(otherQuery);
-      for (const d of otherSnap.docs) {
-        await deleteDoc(doc(db, 'friends', d.id));
-      }
+      await supabaseDeleteFriend(relation.id || '', currentUser.uid, relation.friendUid);
+      onFriendsUpdated(friendsList.filter((f) => f.friendUid !== relation.friendUid));
 
       onFriendsUpdated(friendsList.filter((f) => f.friendUid !== relation.friendUid));
     } catch (err) {

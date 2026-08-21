@@ -7,26 +7,23 @@ import {
   RoomItemReaction,
 } from './types';
 import {
-  auth,
-  db,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  collection,
-  query,
-  where,
-  onSnapshot,
-  orderBy,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-} from './firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import {
   supabaseOnAuthStateChange,
   supabaseSignOut,
   supabaseGetProfile,
+  supabaseSaveProfile,
+  supabaseFetchRoomObjects,
+  supabaseSaveRoomObject,
+  supabaseUpdateRoomObject,
+  supabaseDeleteRoomObject,
+  supabaseFetchFriends,
+  supabaseSaveFriend,
+  supabaseUpdateFriendStatus,
+  supabaseFetchNotifications,
+  supabaseCreateNotification,
+  supabaseMarkNotificationsAsRead,
+  supabaseSubscribeToRoomObjects,
+  supabaseSubscribeToFriends,
+  supabaseSubscribeToNotifications,
   isSupabaseConfigured,
 } from './lib/supabase';
 
@@ -47,6 +44,8 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { FriendManager } from './components/FriendManager';
 import { MyRoomDashboardView } from './components/MyRoomDashboardView';
 import { FriendsRoomFeedView } from './components/FriendsRoomFeedView';
+import { PrivacyPolicyView } from './components/PrivacyPolicyView';
+import { TermsOfServiceView } from './components/TermsOfServiceView';
 import { Loader2 } from 'lucide-react';
 
 const deduplicateObjects = (list: RoomObject[]): RoomObject[] => {
@@ -61,6 +60,17 @@ const deduplicateObjects = (list: RoomObject[]): RoomObject[] => {
 };
 
 export function App() {
+  // Legal Pages routing state (Direct URL support for /privacy and /terms)
+  const [currentLegalView, setCurrentLegalView] = useState<'privacy' | 'terms' | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const path = window.location.pathname.toLowerCase();
+    const search = new URLSearchParams(window.location.search);
+    const page = search.get('page') || search.get('view');
+    if (path.includes('/privacy') || page === 'privacy') return 'privacy';
+    if (path.includes('/terms') || page === 'terms') return 'terms';
+    return null;
+  });
+
   // Navigation & View States
   const [activeTab, setActiveTab] = useState<MainNavTab>('myroom');
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -88,11 +98,44 @@ export function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isFriendManagerOpen, setIsFriendManagerOpen] = useState(false);
 
-  // 1. Auth Listener - Supabase Auth (Primary) + Firebase Auth (Fallback)
+  // URL Routing Listener for Legal Pages (/privacy & /terms)
+  useEffect(() => {
+    const handlePopState = () => {
+      const path = window.location.pathname.toLowerCase();
+      const search = new URLSearchParams(window.location.search);
+      const page = search.get('page') || search.get('view');
+      if (path.includes('/privacy') || page === 'privacy') {
+        setCurrentLegalView('privacy');
+      } else if (path.includes('/terms') || page === 'terms') {
+        setCurrentLegalView('terms');
+      } else {
+        setCurrentLegalView(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const openLegalView = (view: 'privacy' | 'terms') => {
+    setCurrentLegalView(view);
+    const newPath = view === 'privacy' ? '/privacy' : '/terms';
+    if (window.location.pathname !== newPath) {
+      window.history.pushState({}, '', newPath);
+    }
+  };
+
+  const closeLegalView = () => {
+    setCurrentLegalView(null);
+    if (window.location.pathname.includes('/privacy') || window.location.pathname.includes('/terms')) {
+      window.history.pushState({}, '', '/');
+    }
+  };
+
+  // 1. Supabase Auth Listener
   useEffect(() => {
     let isMounted = true;
 
-    // A. Supabase Auth Listener
     const unsubSupabase = supabaseOnAuthStateChange((supabaseUser, profile) => {
       if (!isMounted) return;
       if (supabaseUser && profile) {
@@ -108,106 +151,36 @@ export function App() {
       setAuthLoading(false);
     });
 
-    // B. Firebase Auth Listener (Fallback only when Supabase is not configured)
-    const unsubFirebase = onAuthStateChanged(auth, async (user) => {
-      if (!isMounted) return;
-      if (isSupabaseConfigured) {
-        // Supabase is the primary auth provider
-        return;
-      }
-      if (user) {
-        try {
-          const userDocRef = doc(db, 'users', user.uid);
-          const snap = await getDoc(userDocRef);
+    return () => {
+      isMounted = false;
+      unsubSupabase();
+    };
+  }, []);
 
-          if (snap.exists()) {
-            const data = snap.data() as UserProfile;
-            setCurrentUser(data);
-          } else {
-            const emailPrefix = user.email?.split('@')[0] || user.uid.slice(0, 6);
-            const newProfile: UserProfile = {
-              uid: user.uid,
-              displayName: user.displayName || 'ユーザー',
-              username: `@${emailPrefix}`,
-              photoURL:
-                user.photoURL ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-              bio: '日常のできごとをお部屋に飾っています🌱',
-              customShareCategories: ['親友', '部活', '家族', 'パートナー'],
-              latestStatus: {
-                text: 'Roomonをはじめました！',
-                emoji: '🌱',
-                updatedAt: new Date().toISOString(),
-              },
-              createdAt: new Date().toISOString(),
-            };
-            await setDoc(userDocRef, newProfile, { merge: true });
-            setCurrentUser(newProfile);
-          }
-        } catch (err) {
-          console.error('Error fetching user profile:', err);
-        }
-      } else {
-        setCurrentUser(null);
-        setUserRoomObjects([]);
-        setFriendsList([]);
-        setAllRoomObjects([]);
-        setNotifications([]);
+  // 2. Friends & Realtime Listener
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    let isMounted = true;
+    const loadFriends = async () => {
+      const friends = await supabaseFetchFriends(currentUser.uid);
+      if (isMounted) {
+        setFriendsList(friends);
       }
-      setAuthLoading(false);
+    };
+
+    loadFriends();
+
+    const unsub = supabaseSubscribeToFriends(currentUser.uid, (friends) => {
+      if (isMounted) {
+        setFriendsList(friends);
+      }
     });
 
     return () => {
       isMounted = false;
-      unsubSupabase();
-      unsubFirebase();
+      unsub();
     };
-  }, []);
-
-  // 2. Realtime Friends List Listener from Firestore
-  useEffect(() => {
-    if (!currentUser?.uid) return;
-
-    const q = query(
-      collection(db, 'friends'),
-      where('userId', '==', currentUser.uid)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      async (snapshot) => {
-        const friends: FriendRelation[] = [];
-        for (const docSnap of snapshot.docs) {
-          const fData = docSnap.data() as FriendRelation;
-          // Optionally fetch latest user profile to keep display name/photo synced
-          try {
-            const uSnap = await getDoc(doc(db, 'users', fData.friendUid));
-            if (uSnap.exists()) {
-              const uData = uSnap.data() as UserProfile;
-              friends.push({
-                ...fData,
-                id: docSnap.id,
-                friendDisplayName: uData.displayName || fData.friendDisplayName,
-                friendUsername: uData.username || fData.friendUsername,
-                friendPhotoURL: uData.photoURL || fData.friendPhotoURL,
-                statusText: uData.latestStatus?.text || fData.statusText,
-                statusEmoji: uData.latestStatus?.emoji || fData.statusEmoji,
-              });
-              continue;
-            }
-          } catch {
-            // fallback to stored relation data
-          }
-          friends.push({ id: docSnap.id, ...fData });
-        }
-        setFriendsList(friends);
-      },
-      (error) => {
-        console.error('Friends snapshot listener error:', error);
-      }
-    );
-
-    return () => unsubscribe();
   }, [currentUser?.uid]);
 
   // 3. Check for Invite Link in URL and prompt to connect
@@ -216,18 +189,14 @@ export function App() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const inviteFrom = urlParams.get('invite_from');
-    const inviteName = urlParams.get('name') || '友達';
 
     if (inviteFrom && inviteFrom !== currentUser.uid) {
-      // Clean URL param
       window.history.replaceState({}, document.title, window.location.pathname);
 
-      // Check if already friends
       (async () => {
         try {
-          const uSnap = await getDoc(doc(db, 'users', inviteFrom));
-          if (uSnap.exists()) {
-            const inviter = uSnap.data() as UserProfile;
+          const inviter = await supabaseGetProfile(inviteFrom);
+          if (inviter) {
             const alreadyFriends = friendsList.some((f) => f.friendUid === inviteFrom);
             if (!alreadyFriends) {
               if (
@@ -235,7 +204,8 @@ export function App() {
                   `「${inviter.displayName}」さんから招待されました！友達に追加してお部屋をつなぎますか？`
                 )
               ) {
-                const newFriend: Omit<FriendRelation, 'id'> = {
+                const newFriend: FriendRelation = {
+                  id: `fr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
                   userId: currentUser.uid,
                   friendUid: inviter.uid,
                   friendDisplayName: inviter.displayName,
@@ -243,12 +213,14 @@ export function App() {
                   friendPhotoURL: inviter.photoURL,
                   friendBio: inviter.bio || '親しい友達の部屋',
                   assignedCategories: ['親友'],
+                  status: 'accepted',
                   statusText: inviter.latestStatus?.text || '',
                   statusEmoji: inviter.latestStatus?.emoji || '🌱',
                   createdAt: new Date().toISOString(),
                 };
-                await addDoc(collection(db, 'friends'), newFriend);
+                await supabaseSaveFriend(newFriend);
                 alert(`「${inviter.displayName}」さんとつながりました！🎉`);
+                setFriendsList((prev) => [newFriend, ...prev]);
               }
             }
           }
@@ -259,165 +231,105 @@ export function App() {
     }
   }, [currentUser?.uid, friendsList]);
 
-  // 4. Realtime User Room Objects Listener
+  // 4. Room Objects & Realtime Subscriptions
   useEffect(() => {
     if (!currentUser?.uid) return;
 
-    const q = query(
-      collection(db, 'room_objects'),
-      where('userId', '==', currentUser.uid)
-    );
+    let isMounted = true;
+    const loadObjects = async () => {
+      const objs = await supabaseFetchRoomObjects();
+      if (!isMounted) return;
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const objs: RoomObject[] = [];
-        snapshot.forEach((docSnap) => {
-          objs.push({ id: docSnap.id, ...(docSnap.data() as RoomObject) });
-        });
-
-        // Sort by date descending
-        objs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-        if (objs.length > 0) {
-          setUserRoomObjects(deduplicateObjects(objs));
-          setAllRoomObjects((prev) =>
-            deduplicateObjects([
-              ...objs,
-              ...prev.filter((o) => o.userId !== currentUser.uid),
-            ])
-          );
-        } else {
-          // Initialize user's own room with a lovely starter object
-          const starterObj: RoomObject = {
-            id: `starter_${currentUser.uid}`,
-            userId: currentUser.uid,
-            userDisplayName: currentUser.displayName,
-            assetId: 'starter_mug',
-            name: 'お気に入りのマグカップ',
-            category: 'meal',
-            placementSlot: 'desk',
-            iconEmoji: '☕',
-            imageUrl:
-              'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400&auto=format&fit=crop&q=80',
-            x: 48,
-            y: 65,
-            caption: 'Roomonを始めました！これからの思い出をここに飾っていきます✨',
-            date: new Date().toISOString().slice(0, 10),
-            areaType: 'base_room',
-            isPinned: true,
-            reactions: [],
-            createdAt: new Date().toISOString(),
-          };
-          setUserRoomObjects([starterObj]);
-          setAllRoomObjects((prev) =>
-            deduplicateObjects([
-              starterObj,
-              ...prev.filter((o) => o.userId !== currentUser.uid),
-            ])
-          );
-        }
-      },
-      (error) => {
-        console.error('Room objects snapshot listener error:', error);
+      const myObjs = objs.filter((o) => o.userId === currentUser.uid);
+      if (myObjs.length === 0) {
+        // Starter object
+        const starterObj: RoomObject = {
+          id: `starter_${currentUser.uid}`,
+          userId: currentUser.uid,
+          userDisplayName: currentUser.displayName,
+          assetId: 'starter_mug',
+          name: 'お気に入りのマグカップ',
+          category: 'meal',
+          placementSlot: 'desk',
+          iconEmoji: '☕',
+          imageUrl:
+            'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400&auto=format&fit=crop&q=80',
+          x: 48,
+          y: 65,
+          caption: 'Roomonを始めました！これからの思い出をここに飾っていきます✨',
+          date: new Date().toISOString().slice(0, 10),
+          areaType: 'base_room',
+          isPinned: true,
+          reactions: [],
+          createdAt: new Date().toISOString(),
+        };
+        setUserRoomObjects([starterObj]);
+        setAllRoomObjects(deduplicateObjects([starterObj, ...objs]));
+      } else {
+        setUserRoomObjects(deduplicateObjects(myObjs));
+        setAllRoomObjects(deduplicateObjects(objs));
       }
-    );
+    };
 
-    return () => unsubscribe();
-  }, [currentUser?.uid]);
+    loadObjects();
 
-  // 5. Realtime Friends' Room Objects Listener
-  useEffect(() => {
-    if (friendsList.length === 0) {
-      setAllRoomObjects((prev) => deduplicateObjects(prev.filter((o) => o.userId === currentUser?.uid)));
-      return;
-    }
-
-    const friendUids = friendsList.map((f) => f.friendUid);
-    const unsubscribers: (() => void)[] = [];
-
-    // Listen to each friend's room objects
-    friendUids.forEach((fUid) => {
-      const qFriend = query(
-        collection(db, 'room_objects'),
-        where('userId', '==', fUid)
-      );
-      const unsub = onSnapshot(
-        qFriend,
-        (snapshot) => {
-          const friendObjs: RoomObject[] = [];
-          snapshot.forEach((docSnap) => {
-            friendObjs.push({ id: docSnap.id, ...(docSnap.data() as RoomObject) });
-          });
-          setAllRoomObjects((prev) =>
-            deduplicateObjects([
-              ...prev.filter((o) => o.userId !== fUid),
-              ...friendObjs,
-            ])
-          );
-        },
-        (err) => {
-          console.error(`Friend ${fUid} objects listener error:`, err);
-        }
-      );
-      unsubscribers.push(unsub);
+    const unsub = supabaseSubscribeToRoomObjects(currentUser.uid, (refreshedObjs) => {
+      if (!isMounted) return;
+      const myObjs = refreshedObjs.filter((o) => o.userId === currentUser.uid);
+      setUserRoomObjects(deduplicateObjects(myObjs));
+      setAllRoomObjects(deduplicateObjects(refreshedObjs));
     });
 
     return () => {
-      unsubscribers.forEach((u) => u());
+      isMounted = false;
+      unsub();
     };
-  }, [friendsList, currentUser?.uid]);
+  }, [currentUser?.uid]);
 
-  // 6. Realtime Notifications Listener from Firestore
+  // 5. Realtime Notifications Listener
   useEffect(() => {
     if (!currentUser?.uid) return;
 
-    const q = query(
-      collection(db, 'notifications'),
-      where('userId', '==', currentUser.uid)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const notifs: AppNotification[] = [];
-        snapshot.forEach((docSnap) => {
-          notifs.push({ id: docSnap.id, ...(docSnap.data() as AppNotification) });
-        });
-        notifs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    let isMounted = true;
+    const loadNotifs = async () => {
+      const notifs = await supabaseFetchNotifications(currentUser.uid);
+      if (isMounted) {
         setNotifications(notifs);
-      },
-      (error) => {
-        console.error('Notifications snapshot listener error:', error);
       }
-    );
+    };
 
-    return () => unsubscribe();
+    loadNotifs();
+
+    const unsub = supabaseSubscribeToNotifications(currentUser.uid, (notifs) => {
+      if (isMounted) {
+        setNotifications(notifs);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsub();
+    };
   }, [currentUser?.uid]);
 
   // Handle Post Completion (Image 2 -> 5)
   const handleCompletePost = async (newObj: RoomObject) => {
     try {
       if (currentUser?.uid) {
-        // Sanitize object to remove undefined values
-        const sanitizedObj: any = {};
-        Object.entries(newObj).forEach(([k, v]) => {
-          if (v !== undefined) {
-            sanitizedObj[k] = v;
-          }
-        });
+        const saved = await supabaseSaveRoomObject(newObj);
+        newObj.id = saved.id;
 
-        const docRef = await addDoc(collection(db, 'room_objects'), sanitizedObj);
-        newObj.id = docRef.id;
-
-        // Also update user's latest status
-        await updateDoc(doc(db, 'users', currentUser.uid), {
+        // Update latest status on profile
+        const updatedProfile: UserProfile = {
+          ...currentUser,
           latestStatus: {
             text: `${newObj.name}を飾りました`,
             emoji: newObj.iconEmoji || '🌱',
             updatedAt: new Date().toISOString(),
           },
-        });
+        };
+        await supabaseSaveProfile(updatedProfile);
+        setCurrentUser(updatedProfile);
       }
     } catch (err) {
       console.error('Error saving new room object:', err);
@@ -481,13 +393,13 @@ export function App() {
       createdAt: new Date().toISOString(),
     };
 
-    // If attached to a specific object, persist to Firestore room_objects
+    // If attached to a specific object, persist to room_objects reactions
     if (reactionTargetObject && reactionTargetObject.id) {
       try {
-        const objDocRef = doc(db, 'room_objects', reactionTargetObject.id);
         const curRx = reactionTargetObject.reactions || [];
-        await updateDoc(objDocRef, {
-          reactions: [newReactionItem, ...curRx],
+        const nextRx = [newReactionItem, ...curRx];
+        await supabaseUpdateRoomObject(reactionTargetObject.id, {
+          reactions: nextRx,
         });
       } catch (err) {
         console.error('Error attaching reaction to object:', err);
@@ -508,7 +420,7 @@ export function App() {
       );
     }
 
-    // Add notification to Firestore
+    // Add notification
     const newNotif: Omit<AppNotification, 'id'> = {
       userId: recipientUid,
       type: reaction.type === 'flower' ? 'flower' : reaction.type === 'coffee' ? 'coffee' : 'reaction',
@@ -530,7 +442,7 @@ export function App() {
     };
 
     try {
-      await addDoc(collection(db, 'notifications'), newNotif);
+      await supabaseCreateNotification(newNotif);
     } catch (err) {
       console.error('Error creating notification:', err);
     }
@@ -544,7 +456,7 @@ export function App() {
     if (!currentUser) return;
     try {
       if (!objectId.startsWith('starter_')) {
-        await deleteDoc(doc(db, 'room_objects', objectId));
+        await supabaseDeleteRoomObject(objectId);
       }
       setUserRoomObjects((prev) => prev.filter((o) => (o.id || o.assetId) !== objectId));
       setAllRoomObjects((prev) => prev.filter((o) => (o.id || o.assetId) !== objectId));
@@ -559,7 +471,7 @@ export function App() {
     if (!currentUser) return;
     try {
       if (!objectId.startsWith('starter_')) {
-        await updateDoc(doc(db, 'room_objects', objectId), { x, y });
+        await supabaseUpdateRoomObject(objectId, { x, y });
       }
       setUserRoomObjects((prev) =>
         prev.map((o) => ((o.id || o.assetId) === objectId ? { ...o, x, y } : o))
@@ -577,7 +489,7 @@ export function App() {
     if (!currentUser) return;
     try {
       if (!objectId.startsWith('starter_')) {
-        await updateDoc(doc(db, 'room_objects', objectId), { areaType: newArea });
+        await supabaseUpdateRoomObject(objectId, { areaType: newArea });
       }
       setUserRoomObjects((prev) =>
         prev.map((o) => ((o.id || o.assetId) === objectId ? { ...o, areaType: newArea } : o))
@@ -593,7 +505,6 @@ export function App() {
 
   const handleLogout = async () => {
     if (confirm('ログアウトしますか？')) {
-      // 1. Immediately reset memory state and close modals
       setIsProfileModalOpen(false);
       setIsFriendManagerOpen(false);
       setIsPostingFlowOpen(false);
@@ -606,7 +517,6 @@ export function App() {
       setAllRoomObjects([]);
       setNotifications([]);
 
-      // 2. Clear cached local session keys
       try {
         localStorage.removeItem('roomon_user_profile');
         sessionStorage.clear();
@@ -614,19 +524,21 @@ export function App() {
         console.warn('Storage clear notice:', storageErr);
       }
 
-      // 3. Trigger sign out on both Supabase and Firebase
       try {
         await supabaseSignOut();
       } catch (err) {
         console.warn('Supabase signout notice:', err);
       }
-      try {
-        await signOut(auth);
-      } catch (err) {
-        console.warn('Firebase signout notice:', err);
-      }
     }
   };
+
+  // Legal Policy Views (Accessible directly via URL or buttons, regardless of login state)
+  if (currentLegalView === 'privacy') {
+    return <PrivacyPolicyView onBack={closeLegalView} />;
+  }
+  if (currentLegalView === 'terms') {
+    return <TermsOfServiceView onBack={closeLegalView} />;
+  }
 
   // Loading Screen
   if (authLoading) {
@@ -640,9 +552,15 @@ export function App() {
     );
   }
 
-  // 1. MUST LOGIN: Show AuthScreen if not authenticated (Guest login completely removed)
+  // 1. MUST LOGIN: Show AuthScreen if not authenticated
   if (!currentUser) {
-    return <AuthScreen onLoginSuccess={(user) => setCurrentUser(user)} />;
+    return (
+      <AuthScreen
+        onLoginSuccess={(user) => setCurrentUser(user)}
+        onOpenPrivacy={() => openLegalView('privacy')}
+        onOpenTerms={() => openLegalView('terms')}
+      />
+    );
   }
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -746,81 +664,37 @@ export function App() {
             <NotificationsView
               notifications={notifications}
               onMarkAllAsRead={async () => {
-                // Mark all read in state & Firestore
                 setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-                for (const n of notifications) {
-                  if (!n.read && n.id) {
-                    try {
-                      await updateDoc(doc(db, 'notifications', n.id), { read: true });
-                    } catch {}
-                  }
-                }
+                await supabaseMarkNotificationsAsRead(currentUser.uid);
               }}
               onAcceptFriendRequest={async (senderUid) => {
                 if (!currentUser) return;
                 try {
                   const now = new Date().toISOString();
+                  const existingFriends = await supabaseFetchFriends(currentUser.uid);
+                  const senderFriend = existingFriends.find((f) => f.friendUid === senderUid || f.userId === senderUid);
 
-                  // Query existing friend relations between current user and sender
-                  const q1 = query(
-                    collection(db, 'friends'),
-                    where('userId', '==', currentUser.uid),
-                    where('friendUid', '==', senderUid)
-                  );
-                  const q2 = query(
-                    collection(db, 'friends'),
-                    where('userId', '==', senderUid),
-                    where('friendUid', '==', currentUser.uid)
-                  );
-
-                  const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-
-                  // Update or create currentUser -> sender
-                  if (!snap1.empty) {
-                    for (const d of snap1.docs) {
-                      await updateDoc(doc(db, 'friends', d.id), { status: 'accepted', updatedAt: now });
-                    }
+                  if (senderFriend) {
+                    await supabaseUpdateFriendStatus(senderFriend.id, 'accepted', now);
                   } else {
-                    const senderFriend = friendsList.find((f) => f.friendUid === senderUid);
-                    await addDoc(collection(db, 'friends'), {
+                    const senderProfile = await supabaseGetProfile(senderUid);
+                    await supabaseSaveFriend({
+                      id: `fr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
                       userId: currentUser.uid,
                       friendUid: senderUid,
-                      friendDisplayName: senderFriend?.friendDisplayName || 'お友達',
-                      friendUsername: senderFriend?.friendUsername || '',
-                      friendPhotoURL: senderFriend?.friendPhotoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+                      friendDisplayName: senderProfile?.displayName || 'お友達',
+                      friendUsername: senderProfile?.username || '',
+                      friendPhotoURL: senderProfile?.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
                       status: 'accepted',
+                      assignedCategories: ['親友'],
                       createdAt: now,
-                      updatedAt: now,
+                      acceptedAt: now,
                     });
                   }
 
-                  // Update or create sender -> currentUser
-                  if (!snap2.empty) {
-                    for (const d of snap2.docs) {
-                      await updateDoc(doc(db, 'friends', d.id), { status: 'accepted', updatedAt: now });
-                    }
-                  } else {
-                    await addDoc(collection(db, 'friends'), {
-                      userId: senderUid,
-                      friendUid: currentUser.uid,
-                      friendDisplayName: currentUser.displayName || 'お友達',
-                      friendUsername: currentUser.username || '',
-                      friendPhotoURL: currentUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-                      status: 'accepted',
-                      createdAt: now,
-                      updatedAt: now,
-                    });
-                  }
-
-                  // Mark any related friend_request notifications as read
-                  const reqNotifs = notifications.filter(
-                    (n) => n.type === 'friend_request' && n.senderUid === senderUid && !n.read
-                  );
-                  for (const n of reqNotifs) {
-                    if (n.id) {
-                      await updateDoc(doc(db, 'notifications', n.id), { read: true });
-                    }
-                  }
+                  // Refetch friends
+                  const refreshed = await supabaseFetchFriends(currentUser.uid);
+                  setFriendsList(refreshed);
 
                   alert('友達申請を承認しました！相互フレンドになりました 🤝');
                 } catch (err) {
@@ -831,36 +705,11 @@ export function App() {
               onDeclineFriendRequest={async (senderUid) => {
                 if (!currentUser) return;
                 try {
-                  const now = new Date().toISOString();
-                  const q1 = query(
-                    collection(db, 'friends'),
-                    where('userId', '==', currentUser.uid),
-                    where('friendUid', '==', senderUid)
-                  );
-                  const q2 = query(
-                    collection(db, 'friends'),
-                    where('userId', '==', senderUid),
-                    where('friendUid', '==', currentUser.uid)
-                  );
-
-                  const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
-
-                  for (const d of snap1.docs) {
-                    await updateDoc(doc(db, 'friends', d.id), { status: 'declined', updatedAt: now });
+                  const existingFriends = await supabaseFetchFriends(currentUser.uid);
+                  const senderFriend = existingFriends.find((f) => f.friendUid === senderUid || f.userId === senderUid);
+                  if (senderFriend) {
+                    await supabaseUpdateFriendStatus(senderFriend.id, 'declined');
                   }
-                  for (const d of snap2.docs) {
-                    await updateDoc(doc(db, 'friends', d.id), { status: 'declined', updatedAt: now });
-                  }
-
-                  const reqNotifs = notifications.filter(
-                    (n) => n.type === 'friend_request' && n.senderUid === senderUid && !n.read
-                  );
-                  for (const n of reqNotifs) {
-                    if (n.id) {
-                      await updateDoc(doc(db, 'notifications', n.id), { read: true });
-                    }
-                  }
-
                   alert('友達申請を辞退しました。');
                 } catch (err) {
                   console.error('Decline friend request error:', err);
@@ -939,7 +788,7 @@ export function App() {
           onDeleteObject={handleDeleteObject}
           onUpdatePosition={handleUpdateObjectPosition}
           onToggleArea={handleToggleObjectArea}
-          onEnterRoomEditMode={(targetId) => {
+          onEnterRoomEditMode={(_targetId) => {
             setVisitingRoomTarget({
               profile: {
                 uid: currentUser.uid,
@@ -988,6 +837,8 @@ export function App() {
         currentUser={currentUser}
         onProfileUpdated={(updated) => setCurrentUser(updated)}
         onOpenFriendManager={() => setIsFriendManagerOpen(true)}
+        onOpenPrivacy={() => openLegalView('privacy')}
+        onOpenTerms={() => openLegalView('terms')}
         onLogout={handleLogout}
       />
 

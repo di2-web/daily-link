@@ -1024,6 +1024,14 @@ async function startServer() {
   });
 }
 
-startServer();
+// Only start standalone server when not in serverless runtime (Netlify Functions, Vercel, AWS Lambda)
+if (
+  !process.env.NETLIFY &&
+  !process.env.AWS_LAMBDA_FUNCTION_NAME &&
+  !process.env.LAMBDA_TASK_ROOT &&
+  !process.env.VERCEL
+) {
+  startServer();
+}
 
 export { app };

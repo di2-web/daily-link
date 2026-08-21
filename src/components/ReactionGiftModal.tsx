@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile, RoomObject } from '../types';
-import { db, collection, addDoc } from '../firebase';
+import { supabaseSaveRoomObject, supabaseCreateNotification } from '../lib/supabase';
 import { X, Gift, Sparkles, Coffee, Heart, Mail, Star, Cake, Loader2 } from 'lucide-react';
 
 interface ReactionGiftModalProps {
@@ -85,19 +85,7 @@ export const ReactionGiftModal: React.FC<ReactionGiftModalProps> = ({
     setLoading(true);
 
     try {
-      // 1. Record in reaction_gifts collection
-      await addDoc(collection(db, 'reaction_gifts'), {
-        targetUserId: targetUser.uid,
-        senderUserId: currentUser.uid,
-        senderDisplayName: currentUser.displayName,
-        senderPhotoURL: currentUser.photoURL,
-        reactionType: currentOption.type,
-        message: customMessage,
-        date: selectedDate,
-        createdAt: new Date().toISOString(),
-      });
-
-      // 2. Add spatial object to friend's 'todays_spot' terrace area
+      // 1. Add spatial object to friend's 'todays_spot' terrace area
       const newRoomObject: Omit<RoomObject, 'id'> = {
         userId: targetUser.uid,
         userDisplayName: targetUser.displayName,
@@ -122,8 +110,25 @@ export const ReactionGiftModal: React.FC<ReactionGiftModalProps> = ({
         createdAt: new Date().toISOString(),
       };
 
-      const docRef = await addDoc(collection(db, 'room_objects'), newRoomObject);
-      onGiftSent({ id: docRef.id, ...newRoomObject });
+      const savedObj = await supabaseSaveRoomObject(newRoomObject);
+
+      // 2. Send notification to friend
+      await supabaseCreateNotification({
+        userId: targetUser.uid,
+        type: 'gift',
+        title: 'ギフトが届きました 🎁',
+        description: `${currentUser.displayName}さんがお部屋のテラスに「${currentOption.name}」を置きました！`,
+        iconEmoji: currentOption.iconEmoji,
+        senderUid: currentUser.uid,
+        senderName: currentUser.displayName,
+        senderPhotoURL: currentUser.photoURL,
+        targetObjectId: savedObj.id,
+        targetObjectName: currentOption.name,
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+
+      onGiftSent(savedObj);
 
       alert(`🎉 ${targetUser.displayName}さんの部屋のテラスに「${currentOption.name}」をそっと置きました！`);
       onClose();

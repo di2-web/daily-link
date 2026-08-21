@@ -567,6 +567,110 @@ export async function supabaseSaveFriend(relation: FriendRelation): Promise<Frie
 }
 
 // ============================================================================
+// FRIEND RELATIONS & SEARCH APIS
+// ============================================================================
+
+export async function supabaseSearchUsers(q: string): Promise<UserProfile[]> {
+  const queryText = q.trim();
+  if (!queryText) return [];
+
+  if (!isSupabaseConfigured) {
+    const users = getLocalData<Record<string, UserProfile>>(LOCAL_STORAGE_USERS_KEY, {});
+    const cleanQ = queryText.replace(/^@/, '').toLowerCase();
+    return Object.values(users).filter(
+      (u) =>
+        u.displayName.toLowerCase().includes(cleanQ) ||
+        (u.username && u.username.toLowerCase().includes(cleanQ))
+    );
+  }
+
+  try {
+    const formatted = queryText.startsWith('@') ? queryText : `@${queryText}`;
+    const clean = queryText.replace(/^@/, '');
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .or(`username.ilike.%${clean}%,display_name.ilike.%${clean}%`)
+      .limit(10);
+
+    if (error || !data) return [];
+
+    return data.map((d) => ({
+      uid: d.id,
+      displayName: d.display_name,
+      username: d.username,
+      photoURL: d.photo_url,
+      bio: d.bio,
+      avatarOutfit: d.avatar_outfit,
+      avatarAccessory: d.avatar_accessory,
+      customShareCategories: d.custom_share_categories || ['親友', '部活', '家族', 'パートナー'],
+      latestStatus: d.latest_status,
+      createdAt: d.created_at,
+    }));
+  } catch (err) {
+    console.error('supabaseSearchUsers error:', err);
+    return [];
+  }
+}
+
+export async function supabaseDeleteFriend(id: string, userId: string, friendUid: string): Promise<boolean> {
+  if (!isSupabaseConfigured) {
+    const list = getLocalData<FriendRelation[]>(LOCAL_STORAGE_FRIENDS_KEY, []);
+    const updated = list.filter(
+      (f) => f.id !== id && !(f.userId === userId && f.friendUid === friendUid) && !(f.userId === friendUid && f.friendUid === userId)
+    );
+    setLocalData(LOCAL_STORAGE_FRIENDS_KEY, updated);
+    return true;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('friend_relations')
+      .delete()
+      .or(`id.eq.${id},and(user_id.eq.${userId},friend_uid.eq.${friendUid}),and(user_id.eq.${friendUid},friend_uid.eq.${userId})`);
+
+    return !error;
+  } catch (err) {
+    console.error('supabaseDeleteFriend error:', err);
+    return false;
+  }
+}
+
+export async function supabaseUpdateFriendStatus(
+  relationId: string,
+  status: 'accepted' | 'declined' | 'pending',
+  acceptedAt?: string
+): Promise<boolean> {
+  if (!isSupabaseConfigured) {
+    const list = getLocalData<FriendRelation[]>(LOCAL_STORAGE_FRIENDS_KEY, []);
+    const idx = list.findIndex((f) => f.id === relationId);
+    if (idx >= 0) {
+      list[idx].status = status;
+      if (acceptedAt) list[idx].acceptedAt = acceptedAt;
+      setLocalData(LOCAL_STORAGE_FRIENDS_KEY, list);
+      return true;
+    }
+    return false;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('friend_relations')
+      .update({
+        status,
+        accepted_at: acceptedAt || new Date().toISOString(),
+      })
+      .eq('id', relationId);
+
+    return !error;
+  } catch (err) {
+    console.error('supabaseUpdateFriendStatus error:', err);
+    return false;
+  }
+}
+
+// ============================================================================
 // NOTIFICATIONS API
 // ============================================================================
 
@@ -640,6 +744,194 @@ export async function supabaseCreateNotification(notif: Omit<AppNotification, 'i
   }
 }
 
+export async function supabaseMarkNotificationsAsRead(userId: string): Promise<boolean> {
+  if (!isSupabaseConfigured) {
+    const list = getLocalData<AppNotification[]>(LOCAL_STORAGE_NOTIFS_KEY, []);
+    list.forEach((n) => {
+      if (n.userId === userId) n.read = true;
+    });
+    setLocalData(LOCAL_STORAGE_NOTIFS_KEY, list);
+    return true;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', userId);
+    return !error;
+  } catch (err) {
+    console.error('supabaseMarkNotificationsAsRead error:', err);
+    return false;
+  }
+}
+
+// ============================================================================
+// MOOD WAVE & SHARED MATCH APIS
+// ============================================================================
+
+export async function supabaseSaveWaveCanvas(userId: string, date: string, points: WavePoint[]): Promise<boolean> {
+  const id = `wave_${userId}_${date}`;
+  if (!isSupabaseConfigured) {
+    const waves = getLocalData<Record<string, WavePoint[]>>(LOCAL_STORAGE_WAVE_KEY, {});
+    waves[id] = points;
+    setLocalData(LOCAL_STORAGE_WAVE_KEY, waves);
+    return true;
+  }
+
+  try {
+    const { error } = await supabase.from('wave_canvas').upsert({
+      id,
+      user_id: userId,
+      date,
+      points,
+      updated_at: new Date().toISOString(),
+    });
+    return !error;
+  } catch (err) {
+    console.error('supabaseSaveWaveCanvas error:', err);
+    return false;
+  }
+}
+
+export async function supabaseGetWaveCanvas(userId: string, date: string): Promise<WavePoint[]> {
+  const id = `wave_${userId}_${date}`;
+  if (!isSupabaseConfigured) {
+    const waves = getLocalData<Record<string, WavePoint[]>>(LOCAL_STORAGE_WAVE_KEY, {});
+    return waves[id] || [];
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('wave_canvas')
+      .select('points')
+      .eq('id', id)
+      .single();
+    if (error || !data) return [];
+    return data.points || [];
+  } catch (err) {
+    return [];
+  }
+}
+
+export async function supabaseCreateSharedMatch(match: Omit<SharedMatch, 'id' | 'createdAt'>): Promise<string | null> {
+  const id = `sm_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const row = {
+    id,
+    pass_code: match.passCode,
+    creator_id: match.creatorId,
+    creator_display_name: match.creatorDisplayName,
+    expires_at: match.expiresAt,
+    matched_user_ids: match.matchedUserIds || [match.creatorId],
+    matched_user_names: match.matchedUserNames || [match.creatorDisplayName],
+    object_template: match.objectTemplate,
+    created_at: new Date().toISOString(),
+  };
+
+  if (!isSupabaseConfigured) {
+    const matches = getLocalData<SharedMatch[]>(LOCAL_STORAGE_MATCHES_KEY, []);
+    matches.unshift({ ...match, id, createdAt: row.created_at } as any);
+    setLocalData(LOCAL_STORAGE_MATCHES_KEY, matches);
+    return id;
+  }
+
+  try {
+    const { data, error } = await supabase.from('shared_matches').insert(row).select('id').single();
+    if (error || !data) return null;
+    return data.id;
+  } catch (err) {
+    console.error('supabaseCreateSharedMatch error:', err);
+    return null;
+  }
+}
+
+export async function supabaseFindSharedMatch(passCode: string): Promise<SharedMatch | null> {
+  if (!isSupabaseConfigured) {
+    const matches = getLocalData<SharedMatch[]>(LOCAL_STORAGE_MATCHES_KEY, []);
+    return matches.find((m) => m.passCode.toUpperCase() === passCode.toUpperCase()) || null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('shared_matches')
+      .select('*')
+      .eq('pass_code', passCode.toUpperCase())
+      .gt('expires_at', new Date().toISOString())
+      .single();
+
+    if (error || !data) return null;
+
+    return {
+      id: data.id,
+      passCode: data.pass_code,
+      creatorId: data.creator_id,
+      creatorDisplayName: data.creator_display_name,
+      expiresAt: data.expires_at,
+      matchedUserIds: data.matched_user_ids || [],
+      matchedUserNames: data.matched_user_names || [],
+      objectTemplate: data.object_template,
+      createdAt: data.created_at,
+    };
+  } catch (err) {
+    console.error('supabaseFindSharedMatch error:', err);
+    return null;
+  }
+}
+
+export async function supabaseJoinSharedMatch(matchId: string, user: UserProfile): Promise<SharedMatch | null> {
+  if (!isSupabaseConfigured) {
+    const matches = getLocalData<SharedMatch[]>(LOCAL_STORAGE_MATCHES_KEY, []);
+    const match = matches.find((m) => m.id === matchId);
+    if (!match) return null;
+    if (!match.matchedUserIds.includes(user.uid)) {
+      match.matchedUserIds.push(user.uid);
+      match.matchedUserNames.push(user.displayName);
+      setLocalData(LOCAL_STORAGE_MATCHES_KEY, matches);
+    }
+    return match;
+  }
+
+  try {
+    const { data: match, error: fetchErr } = await supabase
+      .from('shared_matches')
+      .select('*')
+      .eq('id', matchId)
+      .single();
+
+    if (fetchErr || !match) return null;
+
+    const userIds = Array.from(new Set([...(match.matched_user_ids || []), user.uid]));
+    const userNames = Array.from(new Set([...(match.matched_user_names || []), user.displayName]));
+
+    const { data: updated, error: updateErr } = await supabase
+      .from('shared_matches')
+      .update({
+        matched_user_ids: userIds,
+        matched_user_names: userNames,
+      })
+      .eq('id', matchId)
+      .select()
+      .single();
+
+    if (updateErr || !updated) return null;
+
+    return {
+      id: updated.id,
+      passCode: updated.pass_code,
+      creatorId: updated.creator_id,
+      creatorDisplayName: updated.creator_display_name,
+      expiresAt: updated.expires_at,
+      matchedUserIds: updated.matched_user_ids || [],
+      matchedUserNames: updated.matched_user_names || [],
+      objectTemplate: updated.object_template,
+      createdAt: updated.created_at,
+    };
+  } catch (err) {
+    console.error('supabaseJoinSharedMatch error:', err);
+    return null;
+  }
+}
+
 // ============================================================================
 // IMAGE STORAGE API (Supabase Storage Bucket: room-photos)
 // ============================================================================
@@ -690,12 +982,52 @@ export function supabaseSubscribeToRoomObjects(userId: string, onUpdate: (object
   if (!isSupabaseConfigured) return () => {};
 
   const channel = supabase
-    .channel(`room_objects_${userId}`)
+    .channel(`room_objects_live_${userId}_${Date.now()}`)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'room_objects' },
       async () => {
         const refreshed = await supabaseFetchRoomObjects();
+        onUpdate(refreshed);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+export function supabaseSubscribeToFriends(userId: string, onUpdate: (friends: FriendRelation[]) => void) {
+  if (!isSupabaseConfigured) return () => {};
+
+  const channel = supabase
+    .channel(`friends_live_${userId}_${Date.now()}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'friend_relations' },
+      async () => {
+        const refreshed = await supabaseFetchFriends(userId);
+        onUpdate(refreshed);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+export function supabaseSubscribeToNotifications(userId: string, onUpdate: (notifs: AppNotification[]) => void) {
+  if (!isSupabaseConfigured) return () => {};
+
+  const channel = supabase
+    .channel(`notifs_live_${userId}_${Date.now()}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+      async () => {
+        const refreshed = await supabaseFetchNotifications(userId);
         onUpdate(refreshed);
       }
     )

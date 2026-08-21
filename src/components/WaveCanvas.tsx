@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, WavePoint } from '../types';
 import { analyzeMoodWavePoints } from '../lib/geminiApi';
-import { db, doc, setDoc, getDoc } from '../firebase';
+import { supabaseGetWaveCanvas, supabaseSaveWaveCanvas } from '../lib/supabase';
 import { Sparkles, RefreshCw, Check, Info, TrendingUp, Sun, Moon } from 'lucide-react';
 
 interface WaveCanvasProps {
@@ -26,25 +26,14 @@ export const WaveCanvas: React.FC<WaveCanvasProps> = ({
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Initialize 24-hour default flat wave or load from Firestore
+  // Initialize 24-hour default flat wave or load from Supabase
   useEffect(() => {
     const loadWave = async () => {
-      const waveId = `${selectedDate}_${currentUser.uid}`;
       try {
-        const snap = await getDoc(doc(db, 'mood_waves', waveId));
-        if (snap.exists()) {
-          const data = snap.data();
-          if (Array.isArray(data.points) && data.points.length === 24) {
-            setPoints(data.points);
-            if (data.peakDescription) {
-              setPeakInfo({
-                peakHour: data.peakHour || 12,
-                peakType: 'high',
-                insight: data.peakDescription,
-              });
-            }
-            return;
-          }
+        const fetchedPoints = await supabaseGetWaveCanvas(currentUser.uid, selectedDate);
+        if (Array.isArray(fetchedPoints) && fetchedPoints.length === 24) {
+          setPoints(fetchedPoints);
+          return;
         }
       } catch (err) {
         console.warn('Load wave error:', err);
@@ -217,15 +206,7 @@ export const WaveCanvas: React.FC<WaveCanvasProps> = ({
       const aiResult = await analyzeMoodWavePoints(points);
       setPeakInfo(aiResult);
 
-      const waveId = `${selectedDate}_${currentUser.uid}`;
-      await setDoc(doc(db, 'mood_waves', waveId), {
-        userId: currentUser.uid,
-        date: selectedDate,
-        points,
-        peakHour: aiResult.peakHour,
-        peakDescription: aiResult.insight,
-        updatedAt: new Date().toISOString(),
-      });
+      await supabaseSaveWaveCanvas(currentUser.uid, selectedDate, points);
 
       // Calculate current hour mood score for quick post
       const currentHour = new Date().getHours();

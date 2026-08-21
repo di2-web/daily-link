@@ -13,6 +13,9 @@ import {
   Heart,
   Share2,
   Smile,
+  ShieldCheck,
+  FileText,
+  Info,
 } from 'lucide-react';
 
 interface MyPageViewProps {
@@ -22,6 +25,8 @@ interface MyPageViewProps {
   onOpenMyRoom: () => void;
   onOpenFriendManager: () => void;
   onOpenProfileEdit: () => void;
+  onOpenPrivacy?: () => void;
+  onOpenTerms?: () => void;
   onLogout: () => void;
 }
 
@@ -32,6 +37,8 @@ export const MyPageView: React.FC<MyPageViewProps> = ({
   onOpenMyRoom,
   onOpenFriendManager,
   onOpenProfileEdit,
+  onOpenPrivacy,
+  onOpenTerms,
   onLogout,
 }) => {
   const [copied, setCopied] = useState(false);
@@ -169,6 +176,40 @@ export const MyPageView: React.FC<MyPageViewProps> = ({
           </button>
         </div>
 
+        {/* Privacy Policy */}
+        <button
+          onClick={onOpenPrivacy}
+          className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-amber-50 text-amber-800">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-stone-900">プライバシーポリシー</p>
+              <p className="text-[10px] text-stone-500">個人情報の取扱い・Google OAuthポリシー</p>
+            </div>
+          </div>
+          <span className="text-xs text-stone-400">＞</span>
+        </button>
+
+        {/* Terms of Service */}
+        <button
+          onClick={onOpenTerms}
+          className="w-full p-4 flex items-center justify-between hover:bg-stone-50 transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-2xl bg-stone-100 text-stone-700">
+              <FileText className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-stone-900">利用規約</p>
+              <p className="text-[10px] text-stone-500">サービスのご利用条件・AI免責事項</p>
+            </div>
+          </div>
+          <span className="text-xs text-stone-400">＞</span>
+        </button>
+
         {/* Logout */}
         <button
           onClick={onLogout}
@@ -179,6 +220,14 @@ export const MyPageView: React.FC<MyPageViewProps> = ({
           </div>
           <p className="text-xs font-bold">ログアウト</p>
         </button>
+      </div>
+
+      {/* App & Operator Info Card */}
+      <div className="p-4 rounded-3xl bg-stone-100/70 border border-stone-200/80 text-center space-y-1">
+        <p className="text-xs font-bold text-stone-700">Roomon（ルーモン） v1.0</p>
+        <p className="text-[11px] text-stone-500">
+          お問い合わせ: <a href="mailto:di0119264@gmail.com" className="text-amber-900 underline font-medium">di0119264@gmail.com</a>
+        </p>
       </div>
     </div>
   );
