@@ -1,0 +1,163 @@
+{
+  "entities": {
+    "users": {
+      "title": "Roomon User Profile",
+      "description": "User profiles, avatars, and custom closed group categories",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "bio": { "type": "string" },
+        "customShareCategories": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName"]
+    },
+    "posts": {
+      "title": "Moment Posts",
+      "description": "Raw media inputs (text, photo, audio, music, location) converted to room objects",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userDisplayName": { "type": "string" },
+        "userPhotoURL": { "type": "string" },
+        "contentText": { "type": "string" },
+        "mediaUrls": { "type": "array", "items": { "type": "string" } },
+        "audioUrl": { "type": "string" },
+        "locationData": { "type": "object" },
+        "musicMetadata": { "type": "object" },
+        "moodScore": { "type": "number" },
+        "isProtected": { "type": "boolean" },
+        "shareCategories": { "type": "array", "items": { "type": "string" } },
+        "date": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "date"]
+    },
+    "room_objects": {
+      "title": "Room Spatial Objects",
+      "description": "2D/3D spatial furniture, decor, and memory items placed in base room, today's area, or closet",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userDisplayName": { "type": "string" },
+        "userPhotoURL": { "type": "string" },
+        "postId": { "type": "string" },
+        "assetId": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "placementSlot": { "type": "string" },
+        "iconEmoji": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "customTextureUrl": { "type": "string" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "memoryNote": { "type": "string" },
+        "date": { "type": "string" },
+        "areaType": { "type": "string", "enum": ["base_room", "todays_spot", "closet"] },
+        "isPinned": { "type": "boolean" },
+        "isSharedItem": { "type": "boolean" },
+        "sharedMatchId": { "type": "string" },
+        "sharedFriendNames": { "type": "array", "items": { "type": "string" } },
+        "giverUid": { "type": "string" },
+        "giverDisplayName": { "type": "string" },
+        "giverPhotoURL": { "type": "string" },
+        "giftMessage": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "category", "placementSlot", "areaType"]
+    },
+    "shared_matches": {
+      "title": "Shared Item Matches (合言葉)",
+      "description": "Passcode matching sessions for generating synchronized pair/group items",
+      "type": "object",
+      "properties": {
+        "passCode": { "type": "string" },
+        "creatorId": { "type": "string" },
+        "creatorDisplayName": { "type": "string" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "matchedUserIds": { "type": "array", "items": { "type": "string" } },
+        "matchedUserNames": { "type": "array", "items": { "type": "string" } },
+        "objectTemplate": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["passCode", "creatorId", "expiresAt"]
+    },
+    "reaction_gifts": {
+      "title": "Asynchronous Reaction Gifts",
+      "description": "Flowers, coffee, or message cards placed on a friend's room terrace",
+      "type": "object",
+      "properties": {
+        "targetUserId": { "type": "string" },
+        "senderUserId": { "type": "string" },
+        "senderDisplayName": { "type": "string" },
+        "senderPhotoURL": { "type": "string" },
+        "reactionType": { "type": "string" },
+        "message": { "type": "string" },
+        "date": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["targetUserId", "senderUserId", "reactionType"]
+    },
+    "friends": {
+      "title": "Closed Group Friend Relations",
+      "description": "Direct mutual or invited friend connections categorized by group tags",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "friendUid": { "type": "string" },
+        "friendDisplayName": { "type": "string" },
+        "friendPhotoURL": { "type": "string" },
+        "friendBio": { "type": "string" },
+        "assignedCategories": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "friendUid"]
+    },
+    "mood_waves": {
+      "title": "Mood Biorythm Waves",
+      "description": "24-hour emotional wave points for prioritizing highlights",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "points": { "type": "array" },
+        "peakHour": { "type": "number" },
+        "peakDescription": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "User profile documents"
+    },
+    "/posts/{postId}": {
+      "schema": "posts",
+      "description": "Moment posts that generate room items"
+    },
+    "/room_objects/{objectId}": {
+      "schema": "room_objects",
+      "description": "Spatial objects placed in rooms or stored in closet"
+    },
+    "/shared_matches/{matchId}": {
+      "schema": "shared_matches",
+      "description": "Passcode matching sessions for matching items"
+    },
+    "/reaction_gifts/{giftId}": {
+      "schema": "reaction_gifts",
+      "description": "Reaction gifts left on friend terraces"
+    },
+    "/friends/{friendId}": {
+      "schema": "friends",
+      "description": "Closed friend relationships"
+    },
+    "/mood_waves/{waveId}": {
+      "schema": "mood_waves",
+      "description": "Mood wave records"
+    }
+  }
+}
