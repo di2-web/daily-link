@@ -320,15 +320,17 @@ export async function firebaseSearchUsers(q: string): Promise<UserProfile[]> {
 export async function firebaseFetchRoomObjects(userId?: string): Promise<RoomObject[]> {
   try {
     const colRef = collection(db, 'room_objects');
-    let q = query(colRef, orderBy('createdAt', 'desc'));
+    let q = query(colRef);
     if (userId) {
-      q = query(colRef, where('userId', '==', userId), orderBy('createdAt', 'desc'));
+      q = query(colRef, where('userId', '==', userId));
     }
     const snapshot = await getDocs(q);
     const list: RoomObject[] = [];
     snapshot.forEach((doc) => {
       list.push({ ...doc.data(), id: doc.id } as RoomObject);
     });
+    // Sort in memory to avoid requiring Firestore composite indexes
+    list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     return list;
   } catch (err) {
     console.error('firebaseFetchRoomObjects error:', err);
@@ -508,12 +510,14 @@ export async function firebaseUpdateFriendStatus(
 export async function firebaseFetchNotifications(userId: string): Promise<AppNotification[]> {
   try {
     const colRef = collection(db, 'notifications');
-    const q = query(colRef, where('userId', '==', userId), orderBy('createdAt', 'desc'));
+    const q = query(colRef, where('userId', '==', userId));
     const snapshot = await getDocs(q);
     const list: AppNotification[] = [];
     snapshot.forEach((doc) => {
       list.push({ ...doc.data(), id: doc.id } as AppNotification);
     });
+    // Sort in memory to avoid requiring Firestore composite indexes
+    list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     return list;
   } catch (err) {
     console.error('firebaseFetchNotifications error:', err);
@@ -632,12 +636,20 @@ export function firebaseSubscribeToNotifications(
   onUpdate: (notifs: AppNotification[]) => void
 ) {
   const colRef = collection(db, 'notifications');
-  const q = query(colRef, where('userId', '==', userId), orderBy('createdAt', 'desc'));
-  return onSnapshot(q, (snapshot) => {
-    const list: AppNotification[] = [];
-    snapshot.forEach((doc) => {
-      list.push({ ...doc.data(), id: doc.id } as AppNotification);
-    });
-    onUpdate(list);
-  });
+  const q = query(colRef, where('userId', '==', userId));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const list: AppNotification[] = [];
+      snapshot.forEach((doc) => {
+        list.push({ ...doc.data(), id: doc.id } as AppNotification);
+      });
+      // Sort in memory to avoid requiring Firestore composite indexes
+      list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      onUpdate(list);
+    },
+    (err) => {
+      console.warn('firebaseSubscribeToNotifications snapshot warning:', err);
+    }
+  );
 }

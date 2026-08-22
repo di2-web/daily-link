@@ -161,44 +161,21 @@ export async function generateItemImageWithAi(params: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
-    });
+    }).catch(() => null);
 
-    const data = await response.json().catch(() => ({}));
-
-    // If server succeeded with Gemini or Cloudflare
-    if (data.success && data.imageUrl) {
-      const transparentUrl = await makeImageBackgroundTransparent(data.imageUrl);
-      return {
-        imageUrl: transparentUrl,
-        source: data.source || 'gemini',
-        message: data.message || '3D画像を生成しました',
-      };
+    if (response && response.ok) {
+      const data = await response.json().catch(() => ({}));
+      if (data.success && data.imageUrl) {
+        const transparentUrl = await makeImageBackgroundTransparent(data.imageUrl);
+        return {
+          imageUrl: transparentUrl,
+          source: data.source || 'gemini',
+          message: data.message || '3D画像を生成しました',
+        };
+      }
     }
 
     // 3. Fallback: Client-side Puter.js (Anonymous, no login required)
-    const targetPrompt = data.prompt || promptForPuter;
-    const puterImgUrl = await tryPuterTxt2Img(targetPrompt);
-
-    if (puterImgUrl) {
-      const transparentUrl = await makeImageBackgroundTransparent(puterImgUrl);
-      return {
-        imageUrl: transparentUrl,
-        source: 'puterjs',
-        message: 'Puter.js (匿名AI) により画像を生成しました',
-      };
-    }
-
-    // If server provided a fallback SVG/preset
-    if (data.imageUrl) {
-      return {
-        imageUrl: data.imageUrl,
-        source: 'preset',
-        message: '3Dオブジェクトを作成しました',
-      };
-    }
-  } catch (err) {
-    console.log('[ImageGen] Server pipeline error, executing Puter.js anonymous fallback:', err);
-    // 3. Client Puter.js Fallback on network/server error
     const puterImgUrl = await tryPuterTxt2Img(promptForPuter);
     if (puterImgUrl) {
       const transparentUrl = await makeImageBackgroundTransparent(puterImgUrl);
@@ -208,18 +185,41 @@ export async function generateItemImageWithAi(params: {
         message: 'Puter.js (匿名AI) により画像を生成しました',
       };
     }
-  }
 
-  // 4. Guaranteed Fallback Preset
-  const fallbackPreset = FALLBACK_PRESET_IMAGES[params.category || 'desk'] || FALLBACK_PRESET_IMAGES.desk;
-  const transparentPreset = await makeImageBackgroundTransparent(fallbackPreset);
-  
-  return {
-    imageUrl: transparentPreset,
-    source: 'preset',
-    failedAllAi: false,
-    message: '3Dオブジェクトを作成しました',
-  };
+    // 4. Fallback: Direct Pollinations AI (Client-side Direct URL)
+    const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+      `isometric 3D clay miniature toy figurine of ${englishVisual}, clean white plain background, isolated diorama item`
+    )}?width=512&height=512&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+    const transparentPollinations = await makeImageBackgroundTransparent(pollinationsUrl);
+    return {
+      imageUrl: transparentPollinations,
+      source: 'cloudflare',
+      message: 'AI画像を生成しました',
+    };
+  } catch (err) {
+    console.log('[ImageGen] Fallback to direct client generator:', err);
+    try {
+      const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+        `isometric 3D clay miniature toy figurine of ${englishVisual}, clean white plain background, isolated diorama item`
+      )}?width=512&height=512&nologo=true&seed=${Math.floor(Math.random() * 100000)}`;
+      const transparentPollinations = await makeImageBackgroundTransparent(pollinationsUrl);
+      return {
+        imageUrl: transparentPollinations,
+        source: 'cloudflare',
+        message: 'AI画像を生成しました',
+      };
+    } catch {
+      // 5. Guaranteed Fallback Preset
+      const fallbackPreset = FALLBACK_PRESET_IMAGES[params.category || 'desk'] || FALLBACK_PRESET_IMAGES.desk;
+      const transparentPreset = await makeImageBackgroundTransparent(fallbackPreset);
+      return {
+        imageUrl: transparentPreset,
+        source: 'preset',
+        failedAllAi: false,
+        message: '3Dオブジェクトを作成しました',
+      };
+    }
+  }
 }
 
 

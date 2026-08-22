@@ -229,8 +229,12 @@ export const PostingFlowModal: React.FC<PostingFlowModalProps> = ({
           postType,
           feelingEmotion: postType === 'feeling' ? feelingEmotion : undefined,
         }),
-      });
-      const data = await res.json();
+      }).catch(() => null);
+
+      let data: any = {};
+      if (res && res.ok) {
+        data = await res.json().catch(() => ({}));
+      }
       let candidates: SuggestedItem[] = [];
       if (data.items && data.items.length > 0) {
         candidates = data.items;
