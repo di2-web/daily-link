@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 
@@ -1006,6 +1005,9 @@ app.post("/api/ai/analyze-mood-wave", async (req, res) => {
 // Vite middleware for development vs static build
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    // Obfuscate to prevent Netlify bundler from pulling vite into the serverless function
+    const vitePkg = "vite";
+    const { createServer: createViteServer } = await import(vitePkg);
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

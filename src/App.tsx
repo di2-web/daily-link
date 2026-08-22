@@ -63,16 +63,17 @@ const deduplicateObjects = (list: RoomObject[]): RoomObject[] => {
 export type AppRoute = 'home' | 'login' | 'app' | 'privacy' | 'terms';
 
 const getInitialRoute = (): AppRoute => {
-  if (typeof window === 'undefined') return 'home';
+  if (typeof window === 'undefined') return 'login';
   const path = window.location.pathname.toLowerCase();
   const search = new URLSearchParams(window.location.search);
   const page = search.get('page') || search.get('view');
 
   if (path.includes('/privacy') || page === 'privacy') return 'privacy';
   if (path.includes('/terms') || page === 'terms') return 'terms';
-  if (path.includes('/login') || page === 'login') return 'login';
   if (path.includes('/home') || page === 'home') return 'home';
-  return 'home';
+  if (path.includes('/app') || page === 'app') return 'app';
+  if (path.includes('/login') || page === 'login') return 'login';
+  return 'login';
 };
 
 export function App() {
@@ -557,26 +558,27 @@ export function App() {
     );
   }
 
-  // 3. Unauthenticated Visitors: Default to App Homepage (OAuth requirement) or Login
+  // 3. Unauthenticated Visitors: Default to Login Screen, with /home going to Homepage
   if (!currentUser) {
-    if (currentRoute === 'login') {
+    if (currentRoute === 'home') {
+      // Public App Homepage when accessing /home
       return (
-        <AuthScreen
-          onLoginSuccess={(user) => {
-            setCurrentUser(user);
-            navigateToRoute('app');
-          }}
-          onBackToHome={() => navigateToRoute('home')}
+        <LandingHomepageView
+          onOpenAuth={() => navigateToRoute('login')}
           onOpenPrivacy={() => navigateToRoute('privacy')}
           onOpenTerms={() => navigateToRoute('terms')}
         />
       );
     }
 
-    // Public App Homepage for guests and OAuth verification reviewers
+    // Default view: Login Page
     return (
-      <LandingHomepageView
-        onOpenAuth={() => navigateToRoute('login')}
+      <AuthScreen
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          navigateToRoute('app');
+        }}
+        onBackToHome={() => navigateToRoute('home')}
         onOpenPrivacy={() => navigateToRoute('privacy')}
         onOpenTerms={() => navigateToRoute('terms')}
       />

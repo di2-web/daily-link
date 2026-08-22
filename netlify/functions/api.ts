@@ -1,7 +1,14 @@
+import express from "express";
 import serverless from "serverless-http";
-import { app } from "../../server";
+import { app as serverApp } from "../../server";
 
-// Wrap Express app with serverless-http supporting both /api and /.netlify/functions/api paths
-export const handler = serverless(app, {
-  basePath: "",
-});
+const app = express();
+
+app.use(express.json({ limit: "20mb" }));
+app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+
+// Mount the clean API router on both /api and root for Netlify functions
+app.use("/api", serverApp);
+app.use("/", serverApp);
+
+export const handler = serverless(app);
