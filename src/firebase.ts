@@ -39,7 +39,7 @@ export const googleProvider = new GoogleAuthProvider();
 
 // Firestore with databaseId
 const dbId = firebaseConfigJson.firestoreDatabaseId;
-export const db = dbId ? getFirestore(app, dbId) : getFirestore(app);
+export const db = (dbId && dbId !== '(default)') ? getFirestore(app, dbId) : getFirestore(app);
 
 export enum OperationType {
   CREATE = 'create',

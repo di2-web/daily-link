@@ -42,14 +42,20 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
 
-// Initialize Firestore (with databaseId from config)
-export const db: Firestore = initializeFirestore(
-  app,
-  {
-    experimentalAutoDetectLongPolling: true,
-  },
-  firebaseConfig.firestoreDatabaseId || '(default)'
-);
+// Initialize Firestore
+const customDbId = firebaseConfig.firestoreDatabaseId;
+export const db: Firestore =
+  customDbId && customDbId !== '(default)'
+    ? initializeFirestore(
+        app,
+        {
+          experimentalAutoDetectLongPolling: true,
+        },
+        customDbId
+      )
+    : initializeFirestore(app, {
+        experimentalAutoDetectLongPolling: true,
+      });
 
 export type { FirebaseUser };
 

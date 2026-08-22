@@ -1,12 +1,10 @@
 {
-  "projectId": "industrial-coda-3tgzl",
-  "appId": "1:274910487776:web:27c19ff052c12f85205c85",
-  "apiKey": "AIzaSyD5vJnncSATduxBwAoPzrewlMmYlm6M8eU",
-  "authDomain": "industrial-coda-3tgzl.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-remixremixremixd-523401ea-41ef-4890-9c8c-b38127286e74",
-  "storageBucket": "industrial-coda-3tgzl.firebasestorage.app",
-  "messagingSenderId": "274910487776",
-  "measurementId": "",
-  "oAuthClientId": "274910487776-6hhgd4061ijtru2pa2k32rq52del3j50.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "sutetainab-e",
+  "appId": "1:618471725173:web:ff171f3350edbee6e6c03c",
+  "apiKey": "AIzaSyDOnsDInluRg15MPyqXBdbRvN--K7-Uj-w",
+  "authDomain": "sutetainab-e.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "sutetainab-e.firebasestorage.app",
+  "messagingSenderId": "618471725173",
+  "measurementId": "G-CS95WSPZC3"
 }
